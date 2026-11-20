@@ -9,6 +9,19 @@ public:
     {
         output.createDirectory();
         parameter ("movement", 0.6f);
+        juce::MemoryBlock state;
+        processor.getStateInformation (state);
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), (int) state.getSize());
+        xml->setAttribute ("sequenceSeed", 1299142245);
+        juce::AudioProcessor::copyXmlToBinary (*xml, state);
+        processor.setStateInformation (state.getData(), (int) state.getSize());
+        processor.prepareToPlay (48000, 512);
+        juce::MidiBuffer midi;
+        for (int n = 0; n < 600; ++n)
+        {
+            juce::AudioBuffer<float> audio (2, 512);
+            processor.processBlock (audio, midi);
+        }
         startTimer (100);
     }
     int result = 0;
