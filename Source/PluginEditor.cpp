@@ -139,7 +139,7 @@ void MovesEditor::updateLibraryStatus()
     if (nMove == 0 && nBreath == 0)
         libraryStatus.setText (u8 ("Keine Samplebibliothek gefunden \xe2\x80\x93 MOVES bleibt stumm"), juce::dontSendNotification);
     else
-        libraryStatus.setText (juce::String (nMove) + u8 (" Bewegungs- \xc2\xb7 ") + juce::String (nBreath) + " Atem-/Schniefgeraeusche geladen",
+        libraryStatus.setText (juce::String (nMove) + " Bewegungs- und " + juce::String (nBreath) + " Atem-/Schniefgeraeusche geladen",
                                 juce::dontSendNotification);
 }
 
