@@ -18,7 +18,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "MOVES"; }
+    const juce::String getName() const override { return "Moves"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
