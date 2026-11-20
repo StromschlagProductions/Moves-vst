@@ -41,38 +41,38 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
     head ("WARUM MOVES");
     body ("Menschen sind nie vollkommen regungslos: kleine Haltungswechsel, Gewichtsverlagerungen, dezentes "
           "Kleidungsrascheln. In ruhigen Dialogszenen fehlt das oft, weil nur Sprache und bewusst gesetzte "
-          "Foley-Geraeusche verwendet werden \xe2\x80\x93 die Szene wirkt steril. MOVES legt genau diese fast "
-          "unhoerbare Mikropraesenz darunter. Am besten merkt man die Wirkung erst, wenn man MOVES ausschaltet.");
+          "Foley-Geräusche verwendet werden \xe2\x80\x93 die Szene wirkt steril. MOVES legt genau diese fast "
+          "unhörbare Mikropräsenz darunter. Am besten merkt man die Wirkung erst, wenn man MOVES ausschaltet.");
 
     head ("EINSATZ");
-    body ("MOVES auf eine eigene, leere Spur legen \xe2\x80\x93 kein Eingangssignal, keine MIDI-Noten noetig. "
-          "Das Plugin erzeugt selbststaendig eine duenne, unregelmaessige Folge von Ereignissen, auch waehrend "
-          "Sprechpausen. Mehrere Instanzen (z. B. je eine pro Figur) sind moeglich.");
+    body ("MOVES auf eine eigene, leere Spur legen \xe2\x80\x93 kein Eingangssignal, keine MIDI-Noten nötig. "
+          "Das Plugin erzeugt selbstständig eine dünne, unregelmäßige Folge von Ereignissen, auch während "
+          "Sprechpausen. Mehrere Instanzen (z. B. je eine pro Figur) sind möglich.");
 
     head ("MOVEMENT");
     body ("Wie aktiv die simulierte Person ist. Niedrig: seltene Ereignisse, lange Ruhephasen. Mittel: "
-          "natuerlich wirkende, gelegentliche Bewegungen \xe2\x80\x93 fuer die meisten Dialogszenen passend. "
-          "Hoch: haeufigere, lebhaftere Praesenz. Auch bei hoher Einstellung bleibt es eine Folge einzelner "
+          "natürlich wirkende, gelegentliche Bewegungen \xe2\x80\x93 für die meisten Dialogszenen passend. "
+          "Hoch: häufigere, lebhaftere Präsenz. Auch bei hoher Einstellung bleibt es eine Folge einzelner "
           "Ereignisse, kein Dauerrascheln.");
 
     head ("LEVEL");
-    body ("Gesamtlautstaerke der erzeugten Geraeusche, feinstufig fuer sehr leise Hintergruende einstellbar.");
+    body ("Gesamtlautstärke der erzeugten Geräusche, feinstufig für sehr leise Hintergründe einstellbar.");
 
-    head ("ATEM-/SCHNIEFGERAEUSCHE");
-    body ("Ein kleiner Teil der Ereignisse ist ein sehr leiser Atemhauch oder ein Nasengeraeusch \xe2\x80\x93 "
-          "deutlich seltener als Bewegungen und ohne regelmaessigen Atemrhythmus.");
+    head ("ATEM-/SCHNIEFGERÄUSCHE");
+    body ("Ein kleiner Teil der Ereignisse ist ein sehr leiser Atemhauch oder ein Nasengeräusch \xe2\x80\x93 "
+          "deutlich seltener als Bewegungen und ohne regelmäßigen Atemrhythmus.");
 
     head ("REPRODUZIERBARKEIT");
     body ("Bei gleicher Projektposition und gleichen Reglerwerten erzeugt MOVES immer dieselbe Ereignisfolge "
-          "\xe2\x80\x93 ein zweiter Export derselben Szene klingt also nicht zufaellig anders.");
+          "\xe2\x80\x93 ein zweiter Export derselben Szene klingt also nicht zufällig anders.");
 
     head ("Allgemein");
-    body ("Doppelklick auf einen Drehregler oder Strg-Klick setzt ihn auf den Standardwert zurueck.");
+    body ("Doppelklick auf einen Drehregler oder Strg-Klick setzt ihn auf den Standardwert zurück.");
     body ("Look: Dunkel / Hell umschalten, die Wahl wird mit dem Projekt gespeichert. Das Fenster ist am "
           "rechten unteren Rand skalierbar (50" "\xe2\x80\x93" "300 %).");
 
     head ("Idee und Konzept");
-    body ("Lars Eickstaedt, Stromschlag Audio");
+    body ("Lars Eickstädt, Stromschlag Audio");
     note ("Gebaut mit JUCE. Das Klangmaterial sind eigene, unbearbeitete Aufnahmen des Autors.");
 
     return s;
@@ -139,7 +139,7 @@ void MovesEditor::updateLibraryStatus()
     if (nMove == 0 && nBreath == 0)
         libraryStatus.setText (u8 ("Keine Samplebibliothek gefunden \xe2\x80\x93 MOVES bleibt stumm"), juce::dontSendNotification);
     else
-        libraryStatus.setText (juce::String (nMove) + " Bewegungs- und " + juce::String (nBreath) + " Atem-/Schniefgeraeusche geladen",
+        libraryStatus.setText (juce::String (nMove) + u8 (" Bewegungs- und ") + juce::String (nBreath) + u8 (" Atem-/Schniefgeräusche geladen"),
                                 juce::dontSendNotification);
 }
 
