@@ -60,3 +60,12 @@ ungeeignete Dateien entfernen; die Engine kommt mit einer kleineren Bibliothek o
 Die Aufnahmen sind eigenes Audiomaterial des Autors. Die Software-Lizenz von MOVES (siehe README) deckt nicht
 automatisch die Nutzungsrechte an den Aufnahmen ab – diese sind getrennt zu betrachten. Eine Weitergabe der
 Samplebibliothek mit künftigen MOVES-Releases setzt voraus, dass der Autor dafür eine Lizenz festlegt.
+
+## Interne Aufbereitung ab 1.2
+
+Die WAV-Dateien im Repository bleiben unverändert. Beim Laden des Plugins werden kurze
+Impulse mit einer vorausschauenden, geglätteten Pegelhüllkurve abgeschwächt und weiche
+Ränder angewendet. Eine begrenzte Pegelangleichung macht leise Bewegungen nutzbarer und
+ordnet Atem-/Nasengeräusche darunter ein. Zielwerte und Grenzen stehen in den
+[Release-Hinweisen 1.2](releases/1.2.md). Diese Bearbeitung ersetzt keine Hörprüfung
+der Aufnahmeinhalte und kann einen ungeeigneten Geräuschtyp nicht passend machen.

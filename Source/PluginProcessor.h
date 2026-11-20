@@ -39,6 +39,13 @@ public:
     int numMovementSamples() const { return bank ? (int) bank->movements.size() : 0; }
     int numBreathSamples() const { return bank ? (int) bank->breaths.size() : 0; }
 
+    std::shared_ptr<const mv::SampleBank> getSampleBank() const { return bank; }
+    uint32_t getSequenceSeed() const { return sequenceSeed.load(); }
+    double getDisplayPosition() const { return displayPosition.load(); }
+    float getOutputPeak() const { return outputPeak.load(); }
+    uint64_t getDisplayCounter() const { return displayCounter.load(); }
+    int getActivityMask() const { return activityMask.load(); }
+
     std::atomic<int> uiTheme { 0 }, uiWidth { 680 }, uiHeight { 420 };
 
 private:
@@ -47,6 +54,12 @@ private:
     void process (juce::AudioBuffer<float>&, bool bypassed);
 
     mv::Engine engine;
+    std::atomic<uint32_t> sequenceSeed { 1 };
+    uint32_t appliedSeed = 0;
+    std::atomic<double> displayPosition { 0 };
+    std::atomic<float> outputPeak { 0 };
+    std::atomic<int> activityMask { 0 };
+    std::atomic<uint64_t> displayCounter { 0 };
     std::shared_ptr<mv::SampleBank> bank;
     std::vector<float> leftBuf, rightBuf;
 
@@ -54,6 +67,7 @@ private:
     // Standalone-Testlaeufe): dann wird intern ab 0 fortlaufend weitergezaehlt. Siehe
     // Known-Limitations-Hinweis in der Dokumentation.
     int64_t freeRunningPosition = 0;
+    float bypassMix = -1;
 
     std::atomic<float>* pMovement = nullptr;
     std::atomic<float>* pLevel = nullptr;

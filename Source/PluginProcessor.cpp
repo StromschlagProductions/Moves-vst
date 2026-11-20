@@ -17,17 +17,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout MovesProcessor::createLayout
     AudioProcessorValueTreeState::ParameterLayout layout;
 
     auto percent = AudioParameterFloatAttributes().withStringFromValueFunction (
-        [] (float v, int) { return String (roundToInt (v * 100.0f)) + " %"; });
+        [] (float v, int) { return String (roundToInt (v * 100.0f)) + " %"; }).withValueFromStringFunction ([] (const String& text) { return text.replaceCharacter (',', '.').getFloatValue() * 0.01f; });
     auto decibel = AudioParameterFloatAttributes().withStringFromValueFunction (
-        [] (float v, int) { return (v > 0 ? "+" : "") + String (v, 1).replaceCharacter ('.', ',') + " dB"; });
+        [] (float v, int) { return (v > 0 ? "+" : "") + String (v, 1).replaceCharacter ('.', ',') + " dB"; }).withValueFromStringFunction ([] (const String& text) { return text.replaceCharacter (',', '.').getFloatValue(); });
 
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "movement", 1 }, "Movement",
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "movement", 1 }, "Aktivität",
                                                        NormalisableRange<float> (0.0f, 1.0f), 0.4f, percent));
 
     NormalisableRange<float> levelRange (-60.0f, 12.0f, 0.1f);
     levelRange.setSkewForCentre (-18.0f);
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "level", 1 }, "Level",
-                                                       levelRange, 0.0f, decibel));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "level", 1 }, "Lautstärke",
+                                                       levelRange, -6.0f, decibel));
     return layout;
 }
 
@@ -37,6 +37,9 @@ MovesProcessor::MovesProcessor()
 {
     pMovement = apvts.getRawParameterValue ("movement");
     pLevel = apvts.getRawParameterValue ("level");
+    uint32_t initialSeed = 0;
+    while (initialSeed == 0) initialSeed = (uint32_t) juce::Random::getSystemRandom().nextInt();
+    sequenceSeed.store (initialSeed);
     loadSampleLibrary();
 }
 
@@ -87,6 +90,7 @@ void MovesProcessor::loadSampleLibrary()
         if (! decodeWavFromMemory (e.data, e.size, clip)) continue;   // defekte Datei: ueberspringen, Rest bleibt nutzbar
         if (clip.data.empty()) continue;
 
+        mv::conditionClip (clip, isMovement ? mv::Category::movement : mv::Category::breath);
         if (isMovement) newBank->movements.push_back (std::move (clip));
         else newBank->breaths.push_back (std::move (clip));
     }
@@ -98,17 +102,21 @@ void MovesProcessor::loadSampleLibrary()
 void MovesProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     engine.prepare (sampleRate);
+    appliedSeed = sequenceSeed.load();
+    engine.setSeed (appliedSeed);
     engine.setBank (bank);
     const size_t bufSize = (size_t) juce::jmax (samplesPerBlock, 4096);
     leftBuf.assign (bufSize, 0.0f);
     rightBuf.assign (bufSize, 0.0f);
     freeRunningPosition = 0;
+    bypassMix = -1;
 }
 
 void MovesProcessor::reset()
 {
     engine.reset();
     freeRunningPosition = 0;
+    bypassMix = -1;
 }
 
 bool MovesProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -137,11 +145,6 @@ void MovesProcessor::process (juce::AudioBuffer<float>& buffer, bool bypassed)
     if (numSamples == 0 || numCh == 0)
         return;
 
-    if (bypassed)
-    {
-        buffer.clear();
-        return;
-    }
     if (leftBuf.empty()) { buffer.clear(); return; }   // defensiv: Host rief vor prepareToPlay auf
 
     int64_t blockStartSample = freeRunningPosition;
@@ -152,20 +155,30 @@ void MovesProcessor::process (juce::AudioBuffer<float>& buffer, bool bypassed)
                 blockStartSample = *samples;
     }
 
+    const auto wantedSeed = sequenceSeed.load();
+    if (wantedSeed != appliedSeed) { engine.setSeed (wantedSeed); appliedSeed = wantedSeed; }
     mv::Params p;
     p.movement = pMovement->load();
     p.levelDb = pLevel->load();
 
     float* left = leftBuf.data();
     float* right = rightBuf.data();
+    const float bypassTarget = bypassed ? 0.f : 1.f;
+    if (bypassMix < 0) bypassMix = bypassTarget;
+    const float bypassStep = 1.f / float (.040 * engine.getSampleRate());
+    float peak = 0;
+    int mask = 0;
     for (int offset = 0; offset < numSamples;)
     {
         const int count = juce::jmin ((int) leftBuf.size(), numSamples - offset);
         engine.process (left, right, count, p, blockStartSample + offset);
+        mask |= engine.getActiveMask();
         for (int i = 0; i < count; ++i)
         {
-            const float l = std::isfinite (left[i]) ? left[i] : 0.0f;
-            const float r = std::isfinite (right[i]) ? right[i] : 0.0f;
+            bypassMix += juce::jlimit (-bypassStep, bypassStep, bypassTarget - bypassMix);
+            const float l = std::isfinite (left[i]) ? left[i] * bypassMix : 0.0f;
+            const float r = std::isfinite (right[i]) ? right[i] * bypassMix : 0.0f;
+            peak = juce::jmax (peak, std::abs (l), std::abs (r));
             if (numCh == 1)
                 buffer.setSample (0, offset + i, 0.5f * (l + r));
             else
@@ -176,11 +189,16 @@ void MovesProcessor::process (juce::AudioBuffer<float>& buffer, bool bypassed)
     }
 
     freeRunningPosition = blockStartSample + numSamples;
+    displayPosition.store ((double) freeRunningPosition / engine.getSampleRate());
+    outputPeak.store (peak);
+    activityMask.store (bypassMix > .001f ? mask : 0);
+    displayCounter.fetch_add (1);
 }
 
 void MovesProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
+    state.setProperty ("sequenceSeed", (juce::int64) sequenceSeed.load(), nullptr);
     state.setProperty ("theme", uiTheme.load(), nullptr);
     state.setProperty ("uiW", uiWidth.load(), nullptr);
     state.setProperty ("uiH", uiHeight.load(), nullptr);
@@ -194,6 +212,9 @@ void MovesProcessor::setStateInformation (const void* data, int sizeInBytes)
         if (xml->hasTagName ("MOVES"))
         {
             auto state = juce::ValueTree::fromXml (*xml);
+            // Legacy sessions retain the old fixed sequence; new instances have their own seed.
+            const auto savedSeed = (uint32_t) (juce::int64) state.getProperty ("sequenceSeed", (juce::int64) 0x4D6F7665u);
+            sequenceSeed.store (savedSeed);
             uiTheme.store ((int) state.getProperty ("theme", 0));
             uiWidth.store (juce::jlimit (340, 2040, (int) state.getProperty ("uiW", 680)));
             uiHeight.store (juce::jlimit (210, 1260, (int) state.getProperty ("uiH", 420)));

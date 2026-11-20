@@ -1,4 +1,4 @@
-# MOVES – Audio Drama Presence Simulator
+# MOVES – Dezente Bewegungs- und Atemgeräusche
 
 <img src="Assets/logo.png" alt="Stromschlag Audio" height="64">
 
@@ -25,31 +25,52 @@ kurz ausschaltet.
 
 ## Oberfläche
 
-Oben links Logo und Name, rechts Look Dunkel/Hell und die Hilfe (**?**). Darunter eine einzige Karte mit den
-beiden Reglern. Look und Fenstergröße (50–300 %) werden mit dem Projekt gespeichert.
+Oben links Logo und Name, rechts Dunkel/Hell und die Hilfe (**?**). Darunter die Ereignis-
+und Pegelanzeige sowie eine kompakte Karte mit den beiden Reglern. Farbschema und
+Fenstergröße (50–300 %) werden mit dem Projekt gespeichert.
 
 ## Regler (automatisierbar)
 
 | Regler | Wirkung |
 |---|---|
-| **MOVEMENT** | Aktivität der simulierten Person. Niedrig: seltene Ereignisse, lange Ruhephasen, sehr dezent. Mittel: natürlich wirkende, gelegentliche Bewegungen – passend für die meisten Dialogszenen. Hoch: häufigere, lebhaftere Präsenz, aber immer noch eine Folge einzelner Ereignisse statt eines Dauerrauschens. |
-| **LEVEL** | Gesamtlautstärke der erzeugten Geräusche, −60 bis +12 dB, feinstufig im unteren Bereich für sehr leise Hintergründe. |
+| **AKTIVITÄT** | Aktivität der simulierten Person. Niedrig: seltene Ereignisse, lange Ruhephasen, sehr dezent. Mittel: natürlich wirkende, gelegentliche Bewegungen – passend für die meisten Dialogszenen. Hoch: häufigere, lebhaftere Präsenz; einzelne Geräusche können sich deutlich überlagern. |
+| **LAUTSTÄRKE** | Gesamtlautstärke der erzeugten Geräusche, −60 bis +12 dB (Standard −6 dB), feinstufig im unteren Bereich für sehr leise Hintergründe. |
 
 Ein kleiner Teil der Ereignisse (deutlich seltener als Bewegungen, ohne regelmäßigen Atemrhythmus) ist ein
 sehr leiser Atemhauch oder ein Nasengeräusch.
 
+## Anzeige und weiche Wiedergabe (ab 1.2)
+
+Die Ereignisvorschau zeigt Bewegungen in Orange und Atem-/Nasengeräusche in gedämpftem
+Grün. Die Positionsmarke folgt dem Host. Status und Ausgangsanzeige beruhen auf dem
+tatsächlich verarbeiteten Audio; die Anzeige misst Spitzenpegel in dBFS, keine LUFS.
+Bei Änderungen der Aktivität wird die Vorschau für den aktuellen Wert neu berechnet;
+bereits laufende Geräusche klingen aus. Die Vorschau ist keine aufgezeichnete Historie.
+
+Samples werden beim Laden intern behutsam im Pegel angeglichen. Bewegungen erhalten
+einen aktiven RMS-Bezug von −30 dBFS, Atem-/Nasengeräusche von −36 dBFS. Gain ist auf
++36 dB und der Sample-Spitzenpegel auf −16 dBFS begrenzt. Kurze Impulse werden mit einer
+vorausschauenden, geglätteten Hüllkurve abgeschwächt. Weiche Ein-/Ausblendungen schützen
+Sample- und Ereignisränder. Die Originaldateien bleiben unverändert. Eine weiche
+Ausgangskennlinie schützt vor hartem Clipping bei Überlagerungen und hohem Ausgangspegel.
+Diese internen Werte sind keine Lautheitsnormierung des fertigen Hörspiels.
+
+**Wichtig für alte Projekte:** 1.2 klingt bewusst anders. Wichtige ältere Szenen vor dem
+Update als Audio sichern. Das Zustandsformat und die Parameter-IDs bleiben lesbar;
+das stellt keine klangidentische Wiedergabe älterer Versionen sicher.
+
 ## Anwendung
 
 1. MOVES auf eine eigene, leere Spur legen – kein Eingangssignal, keine MIDI-Noten nötig.
-2. MOVEMENT passend zur Szene wählen (ruhiges Zweiergespräch: niedrig bis mittel; unruhigere Szene: höher).
-3. LEVEL so leise einstellen, dass die Spur erst beim Abschalten auffällt.
-4. Für mehrere Figuren ggf. mehrere Instanzen auf getrennten Spuren verwenden (jede erzeugt ihre eigene,
-   unabhängige Ereignisfolge).
+2. AKTIVITÄT passend zur Szene wählen (ruhiges Zweiergespräch: niedrig bis mittel; unruhigere Szene: höher).
+3. LAUTSTÄRKE so leise einstellen, dass die Spur erst beim Abschalten auffällt.
+4. Für mehrere Figuren ggf. mehrere Instanzen auf getrennten Spuren verwenden (jede neu angelegte Instanz erzeugt ihre eigene,
+   unabhängige Ereignisfolge; das Duplizieren des vollständigen Zustands kopiert auch die Folge).
 
 ## Hinweise
 
 - MOVES hat keinen Eingang: Die Spur läuft komplett über den Effekt, es gibt nichts durchzureichen. Im Bypass
-  ist MOVES stumm.
+  ist MOVES nach einem weichen 40-ms-Übergang stumm, sofern der Host den Plugin-Bypass aufruft.
 - **Reproduzierbar:** Bei gleicher Projektposition und gleichen Reglerwerten entsteht immer dieselbe
   Ereignisfolge – ein zweiter Export derselben Szene klingt also nicht zufällig anders, auch nach einem Sprung
   mitten in die Szene oder bei Loop-Wiedergabe. Voraussetzung ist eine während der Wiedergabe gleichbleibende
@@ -61,7 +82,7 @@ sehr leiser Atemhauch oder ein Nasengeräusch.
 
 1. Über den Download-Link oben `Moves-VST3-Windows.zip` bzw. die Release-ZIP laden.
 2. ZIP entpacken und den **ganzen Ordner** `Moves.vst3` nach `C:\Program Files\Common Files\VST3` kopieren.
-3. DAW neu starten bzw. Plugins neu scannen. Primär getestete Zielumgebung: Studio One Pro 8 unter Windows.
+3. DAW neu starten bzw. Plugins neu scannen. Zielumgebung: Studio One Pro 8 unter Windows; die eigene DAW-Abnahme ist separat erforderlich.
 
 ## Unterstützte Plattformen und Formate
 
@@ -92,12 +113,14 @@ Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der
 Release-Ablauf: [docs/VERSIONING.md](docs/VERSIONING.md).
 
 - **1.1** – Der Plugin-Ordner heißt jetzt `Moves.vst3` (wie bei den anderen Plugins, vorher `MOVES.vst3`); Hilfetext mit richtigen Umlauten; Klang und gespeicherte Projekte unverändert. [Release-Hinweise](docs/releases/1.1.md).
+- **1.2** – Neue Abstimmung, Anzeige und Funktionskorrekturen. [Details und Grenzen](docs/releases/1.2.md).
+- **1.1** – Angepasste Schreibweise `Moves.vst3`, deutsche Hilfe.
 - **1.0** – Erste Version. [Release-Hinweise](docs/releases/1.0.md).
 
 ## Aufbau
 
-- `Source/MovesDSP.h`: Klang-Engine (reines C++). Positions-basierte, deterministische Ereignisplanung
-  (Zell-/Hash-Raster statt fortlaufendem Zufallsgenerator) – siehe Kommentar am Dateianfang für die
+- `Source/MovesDSP.h`: Klang-Engine (reines C++). Positionsbasierte, deterministische Ereignisplanung
+  (lokales Prioritätsraster statt fortlaufendem Zufallsgenerator) – siehe Kommentar am Dateianfang für die
   Reproduzierbarkeits-Begründung.
 - `Source/PluginProcessor.*`, `Source/PluginEditor.*`: JUCE-Plugin, Samplebibliothek-Laden und Oberfläche.
 - `Assets/samples/movements`, `Assets/samples/breaths_sniffs`: eingebettete Samplebibliothek, siehe
@@ -121,10 +144,13 @@ Release-Ablauf: [docs/VERSIONING.md](docs/VERSIONING.md).
 
 ### Bekannte Einschränkungen
 
-- **pluginval und Studio One wurden in dieser Entwicklungsumgebung nicht ausgeführt** (kein Windows/VST3-Host
-  verfügbar). Der Windows-Build und pluginval Stufe 8 laufen automatisch in `build.yml`; der eigentliche
-  Praxistest in Studio One steht noch aus und ist Aufgabe des Autors vor der ersten produktiven Nutzung.
-- Die Samplebibliothek wurde automatisch aus den Rohaufnahmen segmentiert, aber noch nicht durchgehört; siehe
+- Die Freigabe für produktive Nutzung erfordert den Windows-Build mit Regressionstests und
+  vollständig abgeschlossenem pluginval Stufe 8 sowie einen Praxistest in Studio One. Eine
+  technische Prüfung ist kein subjektiver Hörtest.
+- Die Positionsgarantie gilt bei festen Parametern, gleichem Seed und gleicher Abtastrate.
+  Glättungshistorien bei Automation benötigen Vorlauf. Weitere Grenzen und die bewussten
+  Klangänderungen gegenüber älteren Projekten: [Release-Hinweise 1.2](docs/releases/1.2.md).
+- Die Samplebibliothek wurde automatisch aus den Rohaufnahmen segmentiert und ab 1.2 intern aufbereitet, aber noch nicht durchgehört; siehe
   [docs/SAMPLES.md](docs/SAMPLES.md) für die automatisch markierten Kandidaten zur Kontrolle.
 - Ohne eine vom Host gemeldete Projektposition (z. B. manche Standalone-Testumgebungen ohne Transport) fällt
   MOVES auf einen intern ab 0 fortlaufend gezählten Ersatzwert zurück; die Reproduzierbarkeits-Garantie gilt

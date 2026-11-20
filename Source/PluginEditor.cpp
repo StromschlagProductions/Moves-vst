@@ -4,9 +4,6 @@
 namespace
 {
 juce::String u8 (const char* s) { return juce::String (juce::CharPointer_UTF8 (s)); }
-const char* kThemeProp = "theme";   // 0 = dunkel, 1 = hell (wird mit dem Projekt gespeichert)
-const char* kUiWProp = "uiW";       // Fenstergroesse (wird mit dem Projekt gespeichert)
-const char* kUiHProp = "uiH";
 }
 
 // Farben wie bei den anderen Stromschlag-Audio-Plugins (Schiefer-Gruen + Orange)
@@ -26,55 +23,23 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
 {
     juce::AttributedString s;
     s.setWordWrap (juce::AttributedString::byWord);
-    s.setJustification (juce::Justification::topLeft);
-
-    auto head = [&] (const char* t)
-    { s.append (u8 (t) + "\n", juce::Font (juce::FontOptions (14.0f, juce::Font::bold)), accent); };
-    auto body = [&] (const char* t)
-    { s.append (u8 (t) + "\n\n", juce::Font (juce::FontOptions (13.0f)), text); };
-    auto note = [&] (const char* t)
-    { s.append (u8 (t) + "\n\n", juce::Font (juce::FontOptions (12.0f)), dim); };
-
-    s.append (u8 ("MOVES \xe2\x80\x93 Hilfe") + u8 (" \xc2\xb7 v") + juce::String (PLUGIN_VERSION_TEXT) + "\n\n",
-              juce::Font (juce::FontOptions (17.0f, juce::Font::bold)), accent);
-
-    head ("WARUM MOVES");
-    body ("Menschen sind nie vollkommen regungslos: kleine Haltungswechsel, Gewichtsverlagerungen, dezentes "
-          "Kleidungsrascheln. In ruhigen Dialogszenen fehlt das oft, weil nur Sprache und bewusst gesetzte "
-          "Foley-Geräusche verwendet werden \xe2\x80\x93 die Szene wirkt steril. MOVES legt genau diese fast "
-          "unhörbare Mikropräsenz darunter. Am besten merkt man die Wirkung erst, wenn man MOVES ausschaltet.");
-
-    head ("EINSATZ");
-    body ("MOVES auf eine eigene, leere Spur legen \xe2\x80\x93 kein Eingangssignal, keine MIDI-Noten nötig. "
-          "Das Plugin erzeugt selbstständig eine dünne, unregelmäßige Folge von Ereignissen, auch während "
-          "Sprechpausen. Mehrere Instanzen (z. B. je eine pro Figur) sind möglich.");
-
-    head ("MOVEMENT");
-    body ("Wie aktiv die simulierte Person ist. Niedrig: seltene Ereignisse, lange Ruhephasen. Mittel: "
-          "natürlich wirkende, gelegentliche Bewegungen \xe2\x80\x93 für die meisten Dialogszenen passend. "
-          "Hoch: häufigere, lebhaftere Präsenz. Auch bei hoher Einstellung bleibt es eine Folge einzelner "
-          "Ereignisse, kein Dauerrascheln.");
-
-    head ("LEVEL");
-    body ("Gesamtlautstärke der erzeugten Geräusche, feinstufig für sehr leise Hintergründe einstellbar.");
-
-    head ("ATEM-/SCHNIEFGERÄUSCHE");
-    body ("Ein kleiner Teil der Ereignisse ist ein sehr leiser Atemhauch oder ein Nasengeräusch \xe2\x80\x93 "
-          "deutlich seltener als Bewegungen und ohne regelmäßigen Atemrhythmus.");
-
-    head ("REPRODUZIERBARKEIT");
-    body ("Bei gleicher Projektposition und gleichen Reglerwerten erzeugt MOVES immer dieselbe Ereignisfolge "
-          "\xe2\x80\x93 ein zweiter Export derselben Szene klingt also nicht zufällig anders.");
-
-    head ("Allgemein");
-    body ("Doppelklick auf einen Drehregler oder Strg-Klick setzt ihn auf den Standardwert zurück.");
-    body ("Look: Dunkel / Hell umschalten, die Wahl wird mit dem Projekt gespeichert. Das Fenster ist am "
-          "rechten unteren Rand skalierbar (50" "\xe2\x80\x93" "300 %).");
-
-    head ("Idee und Konzept");
-    body ("Lars Eickstädt, Stromschlag Audio");
-    note ("Gebaut mit JUCE. Das Klangmaterial sind eigene, unbearbeitete Aufnahmen des Autors.");
-
+    auto head = [&] (const char* t) { s.append (u8 (t) + "\n", juce::Font (juce::FontOptions (14, juce::Font::bold)), accent); };
+    auto body = [&] (const char* t) { s.append (u8 (t) + "\n\n", juce::Font (juce::FontOptions (13)), text); };
+    head ("MOVES – Hilfe");
+    body ("Dezente Bewegungs- und Atemgeräusche für Hörspielszenen. Auf einer eigenen, leeren Spur verwenden; kein Eingangssignal und keine MIDI-Noten nötig.");
+    head ("AKTIVITÄT");
+    body ("Niedrig: einzelne Bewegungen mit längeren Pausen. Mittel: regelmäßige, zurückhaltende Präsenz. Hoch: deutlich lebhaftere, überlappende Bewegungen. Atem-/Nasengeräusche bleiben selten. 0 % bedeutet seltene Ereignisse, keine Stummschaltung.");
+    head ("LAUTSTÄRKE");
+    body ("Ausgangspegel von −60 bis +12 dB. Die eingebauten Geräusche werden intern behutsam im Pegel angeglichen; Atemgeräusche liegen zurückhaltender darunter. −6 dB ist die Grundeinstellung; der Regler normiert nicht die Lautheit der gesamten Szene.");
+    head ("ANZEIGE");
+    body ("Die Zeitleiste zeigt die Ereignisplanung bei der aktuellen Aktivität: Bewegungen orange, Atem-/Nasengeräusche gedämpft grün. Die senkrechte Marke zeigt die aktuelle Position. Bei Änderungen der Aktivität wird die Vorschau neu berechnet; bereits laufende Geräusche klingen weich aus. Status und Pegelanzeige zeigen die tatsächliche Ausgabe. Die Pegelanzeige ist ein Spitzenpegelmesser, kein LUFS-Messer.");
+    head ("WEICHE GERÄUSCHE");
+    body ("Kurze Impulse werden beim Laden vorausschauend abgeschwächt. Weiche Ein- und Ausblendungen schützen die Ereignisränder; Lautstärkeänderungen werden geglättet. Es gibt keine zusätzlichen Regler dafür.");
+    head ("WIEDERGABE UND PROJEKT");
+    body ("Jede neue Instanz hat ihre eigene, im Projekt gespeicherte Ereignisfolge. Bei gleichbleibenden Parametern und gleicher Abtastrate liefern Zeitsprünge und Loops denselben Abschnitt wie durchgehende Wiedergabe. Ohne Hostposition läuft ein interner Zähler. Klangänderungen gegenüber älteren Versionen sind beabsichtigt; wichtige ältere Szenen vorher als Audio sichern.");
+    head ("BEDIENUNG");
+    body ("Doppelklick oder Strg-Klick setzt einen Regler zurück. Zahlenwerte können direkt eingegeben werden, auch mit Dezimalkomma. Dunkel/Hell und Fenstergröße werden mit dem Projekt gespeichert. Die Oberfläche ist von 50 bis 300 % skalierbar.");
+    s.append (u8 ("Idee und Konzept: Lars Eickstädt · Stromschlag Audio"), juce::Font (juce::FontOptions (12)), dim);
     return s;
 }
 
@@ -87,12 +52,13 @@ MovesEditor::MovesEditor (MovesProcessor& p) : AudioProcessorEditor (&p), proces
         c->setFixedAspectRatio ((double) kBaseW / (double) kBaseH);
 
     logo = juce::ImageCache::getFromMemory (BinaryData::logo_png, BinaryData::logo_pngSize);
-    theme = (int) processor.apvts.state.getProperty (kThemeProp, 0) == 1 ? lightTheme() : darkTheme();
+    theme = processor.uiTheme.load() == 1 ? lightTheme() : darkTheme();
     setLookAndFeel (&look);
 
-    setupKnob (movement, "movement", "MOVEMENT");
-    setupKnob (level, "level", "LEVEL");
+    setupKnob (movement, "movement", "AKTIVITÄT");
+    setupKnob (level, "level", "LAUTSTÄRKE");
 
+    content.addAndMakeVisible (events);
     libraryStatus.setJustificationType (juce::Justification::centred);
     libraryStatus.setFont (juce::FontOptions (11.5f));
     content.addAndMakeVisible (libraryStatus);
@@ -100,7 +66,7 @@ MovesEditor::MovesEditor (MovesProcessor& p) : AudioProcessorEditor (&p), proces
     themeButton.onClick = [this]
     {
         theme = theme.dark ? lightTheme() : darkTheme();
-        processor.apvts.state.setProperty (kThemeProp, theme.dark ? 0 : 1, nullptr);
+        processor.uiTheme.store (theme.dark ? 0 : 1);
         applyTheme();
     };
     content.addAndMakeVisible (themeButton);
@@ -120,9 +86,9 @@ MovesEditor::MovesEditor (MovesProcessor& p) : AudioProcessorEditor (&p), proces
 
     applyTheme();
     updateLibraryStatus();
-    startTimerHz (2);   // zeigt die Bibliothek an, sobald sie geladen ist (robust, falls das sehr schnell geht)
+    startTimerHz (20);   // zeigt die Bibliothek an, sobald sie geladen ist (robust, falls das sehr schnell geht)
 
-    const int savedW = (int) processor.apvts.state.getProperty (kUiWProp, kBaseW);
+    const int savedW = processor.uiWidth.load();
     const int restoredW = juce::jlimit (kBaseW / 2, kBaseW * 3, savedW);
     setSize (restoredW, juce::roundToInt ((float) restoredW * (float) kBaseH / (float) kBaseW));
     sizeReady = true;
@@ -130,7 +96,7 @@ MovesEditor::MovesEditor (MovesProcessor& p) : AudioProcessorEditor (&p), proces
 
 MovesEditor::~MovesEditor() { setLookAndFeel (nullptr); }
 
-void MovesEditor::timerCallback() { updateLibraryStatus(); }
+void MovesEditor::timerCallback() { events.refresh(); }
 
 void MovesEditor::updateLibraryStatus()
 {
@@ -145,6 +111,7 @@ void MovesEditor::updateLibraryStatus()
 
 void MovesEditor::applyTheme()
 {
+    events.colours (theme.panel, theme.text, theme.dim, theme.accent, theme.line);
     look.setColour (juce::Slider::thumbColourId, theme.accent);
     look.setColour (juce::Slider::rotarySliderFillColourId, theme.accent);
     look.setColour (juce::Slider::rotarySliderOutlineColourId, theme.line);
@@ -161,7 +128,7 @@ void MovesEditor::applyTheme()
     movement.label.setColour (juce::Label::textColourId, theme.dim);
     level.label.setColour (juce::Label::textColourId, theme.dim);
     libraryStatus.setColour (juce::Label::textColourId, theme.dim);
-    themeButton.setButtonText (theme.dark ? "Look: Dunkel" : "Look: Hell");
+    themeButton.setButtonText (theme.dark ? "Dunkel" : "Hell");
     helpText.setAttributed (buildHelp (theme.text, theme.accent, theme.dim), theme.panel);
     helpScroll.fill = theme.panel;
     helpScroll.edge = theme.line;
@@ -209,60 +176,25 @@ void MovesEditor::paint (juce::Graphics& g)
     g.drawText ("MOVES", 80, 8, 110, 30, juce::Justification::centredLeft);
     g.setColour (theme.accent);
     g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
-    g.drawText ("AUDIO DRAMA PRESENCE SIMULATOR", 188, 15, 330, 22, juce::Justification::centredLeft);
+    g.drawText ("BEWEGUNG & PRÄSENZ", 188, 15, 330, 22, juce::Justification::centredLeft);
     g.setColour (theme.dim);
     g.setFont (juce::FontOptions (11.0f));
     g.drawText (u8 ("STROMSCHLAG AUDIO  \xc2\xb7  v" PLUGIN_VERSION_TEXT), 80, 36, 300, 16, juce::Justification::centredLeft);
 
-    // Kleines Symbol: ein ruhiger Punkt (die Person) mit zwei kaum merklichen Wellen (Mikrobewegung)
-    {
-        juce::Path dot, waves;
-        const float cx = 0.0f, cy = 0.0f;
-        dot.addEllipse (cx - 3.5f, cy - 3.5f, 7.0f, 7.0f);
-        for (float r : { 7.0f, 12.0f, 17.0f })
-            waves.addArc (cx - r, cy - r, 2.0f * r, 2.0f * r,
-                          -juce::MathConstants<float>::pi * 0.32f,
-                          juce::MathConstants<float>::pi * 0.32f, true);
-
-        juce::GlyphArrangement ga;
-        ga.addLineOfText (juce::Font (juce::FontOptions (13.0f, juce::Font::bold)),
-                          "AUDIO DRAMA PRESENCE SIMULATOR", 0.0f, 0.0f);
-        const float subEnd = 188.0f + ga.getBoundingBox (0, -1, true).getWidth();
-        const float helpX = (float) (kBaseW - 170);
-        const float mid = 0.5f * (subEnd + helpX);
-        const auto placeXf = juce::AffineTransform::scale (1.1f).translated (mid, 25.0f);
-        dot.applyTransform (placeXf);
-        waves.applyTransform (placeXf);
-
-        const auto ink = theme.panel.interpolatedWith (theme.text, 0.30f);
-        const auto fill = theme.panel.interpolatedWith (theme.text, 0.14f);
-        g.setColour (fill);
-        g.fillPath (dot);
-        g.setColour (ink);
-        g.strokePath (waves, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    }
-
-    // Einzige Karte: MOVEMENT und LEVEL
-    const float cardX = 12.0f, cardY = 84.0f, cardW = (float) W - 24.0f, cardH = 320.0f;
     g.setColour (theme.panel);
-    g.fillRoundedRectangle (cardX, cardY, cardW, cardH, 8.0f);
+    g.fillRoundedRectangle (12.0f, 278.0f, 656.0f, 126.0f, 8.0f);
     g.setColour (theme.line);
-    g.drawRoundedRectangle (cardX + 0.5f, cardY + 0.5f, cardW - 1.0f, cardH - 1.0f, 8.0f, 1.0f);
-    g.setColour (theme.accent);
-    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
-    g.drawText ("MOVES", (int) cardX + 16, (int) cardY + 14, 200, 16, juce::Justification::centredLeft);
-    g.setColour (theme.dim);
-    g.setFont (juce::FontOptions (10.5f));
-    g.drawText (u8 ("Audio Drama Presence Simulator"), (int) cardX + 16, (int) cardY + 14, (int) cardW - 32, 16,
-                juce::Justification::centredRight);
+    g.drawRoundedRectangle (12.5f, 278.5f, 655.0f, 125.0f, 8.0f, 1.0f);
+    g.drawVerticalLine (340, 296.0f, 376.0f);
+
 }
 
 void MovesEditor::resized()
 {
     if (sizeReady)
     {
-        processor.apvts.state.setProperty (kUiWProp, getWidth(), nullptr);
-        processor.apvts.state.setProperty (kUiHProp, getHeight(), nullptr);
+        processor.uiWidth.store (getWidth());
+        processor.uiHeight.store (getHeight());
     }
     uiScale = std::min ((float) getWidth() / kBaseW, (float) getHeight() / kBaseH);
     content.setTransform (juce::AffineTransform::scale (uiScale));
@@ -275,14 +207,75 @@ void MovesEditor::resized()
     helpScroll.setBounds (12, 84, w - 24, 320);
     helpText.setWidth (helpScroll.getMaximumVisibleWidth());
 
-    auto placeKnob = [] (Knob& k, int cx, int y, int cw)
+    events.setBounds (12, 84, w - 24, 180);
+    auto placeKnob = [] (Knob& k, int x)
     {
-        k.label.setBounds (cx - cw / 2, y, cw, 18);
-        k.slider.setBounds (cx - cw / 2 + 10, y + 22, cw - 20, 170);
+        k.label.setBounds (x, 292, 220, 18);
+        k.slider.setBounds (x + 30, 311, 160, 74);
     };
-    placeKnob (movement, w / 2 - 150, 150, 200);
-    placeKnob (level, w / 2 + 150, 150, 200);
-
-    libraryStatus.setBounds (24, 364, w - 48, 20);
+    placeKnob (movement, 66);
+    placeKnob (level, 394);
+    libraryStatus.setBounds (24, 386, w - 48, 14);
     helpScroll.toFront (false);
+}
+
+void EventDisplay::refresh()
+{
+    const auto counter=processor.getDisplayCounter();
+    const bool changed=counter!=lastCounter;
+    idle=changed ? 0 : idle+1;
+    meter=juce::jmax(meter*.86f,changed ? processor.getOutputPeak() : 0.f);
+    mask=idle<4 ? processor.getActivityMask() : 0;
+    lastCounter=counter;
+    const auto seed=processor.getSequenceSeed();
+    if(seed!=lastSeed) {preview.setSeed(seed);lastSeed=seed;}
+    repaint();
+}
+
+void EventDisplay::paint(juce::Graphics& g)
+{
+    auto bounds=getLocalBounds().toFloat();
+    g.setColour(bg);g.fillRoundedRectangle(bounds,8);
+    g.setColour(line);g.drawRoundedRectangle(bounds.reduced(.5f),8,1);
+    g.setFont(juce::FontOptions(12,juce::Font::bold));g.setColour(accent);
+    g.drawText(u8("EREIGNISSE"),16,10,180,20,juce::Justification::centredLeft);
+    const juce::String status=mask==3 ? u8("Bewegung + Atemgeräusch") : mask==1 ? "Bewegung" : mask==2 ? u8("Atemgeräusch") : "Ruhephase";
+    g.setColour(text);g.setFont(juce::FontOptions(12));
+    g.drawText(status,getWidth()-300,10,282,20,juce::Justification::centredRight);
+    const float x0=108, x1=float(getWidth()-20), y0=58, y1=96;
+    const double now=processor.getDisplayPosition(), begin=now-3, span=8;
+    auto x=[&](double t){return x0+float((t-begin)/span)*(x1-x0);};
+    g.setColour(dim);g.setFont(juce::FontOptions(11));
+    g.drawText("Bewegung",16,int(y0)-8,86,18,juce::Justification::centredLeft);
+    g.drawText(u8("Atem/Nase"),16,int(y1)-8,86,18,juce::Justification::centredLeft);
+    for(int i=-3;i<=5;++i)
+    {
+        const float px=x(now+i);g.setColour(line);g.drawVerticalLine(int(px),40,118);
+        if(i!=0) {g.setColour(dim);g.drawText(juce::String(i)+" s",int(px)-18,119,36,15,juce::Justification::centred);}
+    }
+    const float activity=processor.apvts.getRawParameterValue("movement")->load();
+    const int64_t first=std::max<int64_t>(0,int64_t(std::floor((begin-4)/mv::Engine::kCellSeconds)));
+    const int64_t last=int64_t(std::ceil((begin+span)/mv::Engine::kCellSeconds));
+    g.saveState();g.reduceClipRegion(int(x0),38,int(x1-x0),76);
+    for(int64_t cell=first;cell<=last;++cell)
+    {
+        mv::Engine::Event ev;if(!preview.eventAt(cell,activity,ev))continue;
+        const double start=double(ev.start)/48000;
+        if(start+ev.duration<begin)continue;
+        const bool movement=ev.category==mv::Category::movement;
+        const float px=x(start),width=juce::jmax(2.f,x(start+ev.duration)-px);
+        const float cy=movement?y0:y1;
+        const auto colour=movement?accent:text.interpolatedWith(bg,.4f);
+        // Rounded event bars communicate duration without invented audio waveforms.
+        g.setColour(colour.withAlpha(start<=now&&start+ev.duration>now?.95f:.42f));
+        g.fillRoundedRectangle(px,cy-6,width,12,5);
+    }
+    g.restoreState();g.setColour(text.withAlpha(.9f));g.drawVerticalLine(int(x(now)),38,118);
+    g.setFont(juce::FontOptions(10));g.drawText("JETZT",int(x(now))-25,119,50,15,juce::Justification::centred);
+    const float db=meter>1e-5f?juce::Decibels::gainToDecibels(meter):-100;
+    g.setColour(dim);g.drawText("AUSGANG",16,149,82,16,juce::Justification::centredLeft);
+    auto bar=juce::Rectangle<float>(x0,153,x1-x0-82,6);
+    g.setColour(line);g.fillRoundedRectangle(bar,3);
+    g.setColour(accent);g.fillRoundedRectangle(bar.withWidth(bar.getWidth()*juce::jlimit(0.f,1.f,(db+60)/60)),3);
+    g.setColour(text);g.drawText(db<=-60?u8("< −60 dBFS"):juce::String(db,1).replaceCharacter('.',',')+" dBFS",getWidth()-108,145,88,20,juce::Justification::centredRight);
 }

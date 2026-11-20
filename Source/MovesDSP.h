@@ -6,335 +6,222 @@
 #include <memory>
 #include <vector>
 
-// MOVES - Klang-Engine (reines C++, kein JUCE).
-//
-// Grundidee: menschliche Mikropraesenz (Koerper-/Kleidungsbewegungen, selten ein
-// Atemhauch) als duenne Folge einzelner Sample-Ereignisse, nicht als Dauergeraeusch.
-//
-// Determinismus/Reproduzierbarkeit (Pflichtanforderung, siehe Entwicklungsauftrag Abschnitt 10):
-// Es gibt KEINEN fortlaufenden Zufallsgenerator, dessen Zustand von der Wiedergabe-
-// geschichte abhaengt. Stattdessen wird die Zeitachse in feste "Zellen" (kCellSeconds)
-// eingeteilt; der Inhalt jeder Zelle (ob/was/wie laut/wie schnell ein Ereignis beginnt)
-// ist eine reine Funktion aus (Seed, Zellindex) ueber eine Hash-Funktion - unabhaengig
-// davon, ob man ab Projektanfang durchspielt, mitten in die Szene hineinspringt, einen
-// Loop wiederholt oder offline rendert. Einzige Voraussetzung ist eine gleichbleibende
-// Abtastrate waehrend der Wiedergabe (siehe getrennte Dokumentation zu Bekannten Grenzen).
-//
-// Eine kleine, auf eine "Epoche" begrenzte Rueckschau (kEpochCells Zellen) sorgt fuer
-// Mindestabstaende zwischen Ereignissen und vermeidet unmittelbare Wiederholungen,
-// ohne dass man dafuer die gesamte Zeitachse von Null an abspielen muesste: die Rueckschau
-// kostet bei jeder Zelle hoechstens kEpochCells billige Hash-Auswertungen - das ist auch
-// fuer sehr lange Szenen (Stunden) und fuer beliebige Sprungstellen schnell genug fuer
-// den Audio-Thread.
 namespace mv
 {
-
-// ---------------------------------------------------------------------------
-// Kleine Hilfsfunktionen (Stil wie in den anderen Stromschlag-DSP-Headern)
-inline float finiteClamp (float x, float lo, float hi, float fallback)
-{
-    return std::isfinite (x) ? std::clamp (x, lo, hi) : fallback;
-}
-inline double validRate (double x) { return std::isfinite (x) && x >= 8000.0 && x <= 384000.0 ? x : 48000.0; }
-inline float dbToLin (float db) { return db <= -90.0f ? 0.0f : std::pow (10.0f, db * 0.05f); }
-inline float lerp (float a, float b, float t) { return a + (b - a) * t; }
-
-// splitmix64: schneller, gut durchmischender Zaehler-Hash. Keine fortlaufende Zustandskette -
-// jeder Aufruf mit demselben (seed, index) liefert immer dieselben Zahlen.
-inline uint64_t splitmix64 (uint64_t x)
+inline float finiteClamp(float x, float lo, float hi, float fallback)
+{ return std::isfinite(x) ? std::clamp(x, lo, hi) : fallback; }
+inline double validRate(double x) { return std::isfinite(x) && x >= 8000 && x <= 384000 ? x : 48000; }
+inline float dbToLin(float db) { return db <= -90 ? 0 : std::pow(10.0f, db * .05f); }
+inline float lerp(float a, float b, float t) { return a + (b-a)*t; }
+inline uint64_t splitmix64(uint64_t x)
 {
     x += 0x9E3779B97F4A7C15ULL;
     x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
     x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
     return x ^ (x >> 31);
 }
-
-// Mehrere unabhaengig wirkende Zufallswerte [0,1) fuer eine Zelle, rein aus (seed, cellIndex, salt).
-inline float cellRandom (uint32_t seed, int64_t cellIndex, uint32_t salt)
+inline float cellRandom(uint32_t seed, int64_t cell, uint32_t salt)
 {
-    uint64_t state = (uint64_t) seed * 0x9E3779B97F4A7C15ULL
-                      ^ (uint64_t) (cellIndex + 1) * 0xD1B54A32D192ED03ULL
-                      ^ (uint64_t) salt * 0x2545F4914F6CDD1DULL;
-    const uint64_t z = splitmix64 (state);
-    return (float) ((z >> 11) * (1.0 / 9007199254740992.0));   // 53 Bit -> [0,1)
+    const auto x = uint64_t(seed) * 0x9E3779B97F4A7C15ULL
+                 ^ (uint64_t(cell) + 1) * 0xD1B54A32D192ED03ULL
+                 ^ uint64_t(salt) * 0x2545F4914F6CDD1DULL;
+    return float((splitmix64(x) >> 40) * (1.0 / 16777216.0));
 }
-
-//==============================================================================
-// Ein einzelnes, dekodiertes Sample (mono, Originalabtastrate der Aufnahme).
-struct SampleClip
-{
-    std::vector<float> data;
-    double sourceRate = 48000.0;
-};
-
-// Die komplette Samplebibliothek, nach dem Laden unveraendert (read-only fuer die Engine).
-struct SampleBank
-{
-    std::vector<SampleClip> movements;
-    std::vector<SampleClip> breaths;
-};
-
 enum class Category { movement, breath };
-
-struct Params
+struct SampleClip { std::vector<float> data; double sourceRate = 48000; };
+struct SampleBank { std::vector<SampleClip> movements, breaths; };
+struct Params { float movement = .4f, levelDb = -6; };
+inline Params sanitize(Params p)
 {
-    float movement = 0.4f;   // MOVEMENT 0..1: Aktivitaet der simulierten Person
-    float levelDb = 0.0f;     // LEVEL in dB: Gesamtlautstaerke
-};
-
-inline Params sanitize (Params p)
-{
-    p.movement = finiteClamp (p.movement, 0.0f, 1.0f, 0.4f);
-    p.levelDb = finiteClamp (p.levelDb, -60.0f, 12.0f, 0.0f);
+    p.movement = finiteClamp(p.movement, 0, 1, .4f);
+    p.levelDb = finiteClamp(p.levelDb, -60, 12, -6);
     return p;
 }
+inline float cosineFade(double x)
+{ return .5f - .5f * float(std::cos(3.141592653589793 * std::clamp(x, 0.0, 1.0))); }
 
-//==============================================================================
+// Runs once on loading, never in processBlock. Preserve source WAVs. A bidirectional
+// peak envelope anticipates isolated impulses; smooth gain reduces their crest before
+// bounded active-RMS matching. Breaths deliberately sit 6 dB below movements.
+inline void conditionClip(SampleClip& clip, Category category)
+{
+    auto& x = clip.data;
+    if (x.empty()) return;
+    const double rate = validRate(clip.sourceRate);
+    float peak = 0;
+    for (auto& s : x) { if (!std::isfinite(s)) s = 0; peak = std::max(peak, std::abs(s)); }
+    if (peak < 1.0e-8f) { std::fill(x.begin(), x.end(), 0); return; }
+    double energy = 0; size_t active = 0;
+    for (float s : x) { energy += double(s)*s; ++active; }
+    const float rms = float(std::sqrt(energy / double(std::max<size_t>(1, active))));
+    const float threshold = std::max(1.0e-8f, rms * 2.8f);
+    std::vector<float> envelope(x.size());
+    const float ahead = float(std::exp(-1.0 / (.025 * rate)));
+    float e = 0;
+    for (size_t i = x.size(); i-- > 0;) { e = std::max(std::abs(x[i]), e*ahead); envelope[i] = e; }
+    const float release = float(std::exp(-1.0 / (.090 * rate)));
+    const float smoothing = float(1-std::exp(-1.0/(.004*rate)));
+    float gain = 1; e = 0;
+    for (size_t i = 0; i < x.size(); ++i)
+    {
+        e = std::max(envelope[i], e*release);
+        const float desired = e > threshold ? std::pow(threshold/e, .75f) : 1;
+        gain += (desired-gain)*smoothing;
+        const double fadeIn = std::min(.035*rate, double(x.size())*.2);
+        const double fadeOut = std::min(.080*rate, double(x.size())*.25);
+        x[i] *= gain * cosineFade(double(i)/std::max(1.0,fadeIn))
+                     * cosineFade(double(x.size()-1-i)/std::max(1.0,fadeOut));
+    }
+    peak = 0; for (float s : x) peak = std::max(peak,std::abs(s));
+    energy = 0; active = 0;
+    for (float s : x) if (std::abs(s)>peak*.032f) { energy += double(s)*s; ++active; }
+    const float shapedRms = float(std::sqrt(energy/double(std::max<size_t>(1,active))));
+    const float target = dbToLin(category == Category::movement ? -30.f : -36.f);
+    const float makeup = std::min({target/std::max(shapedRms,1.0e-8f),
+                                  dbToLin(-16.f)/std::max(peak,1.0e-8f), dbToLin(36.f)});
+    for (auto& s : x) s *= makeup;
+}
+
+// A local-priority point process: an eligible cell wins only if no higher-priority
+// eligible neighbour lies within the category's minimum distance. This is a pure,
+// bounded local query, including across former 90-second boundaries. No epoch resets,
+// RNG history, allocation or locks. Voices use absolute sample offsets, so seeks and
+// loops reconstruct the same tails as uninterrupted playback at constant parameters.
 class Engine
 {
 public:
-    static constexpr float kCellSeconds = 0.2f;      // Rasterbreite der Zeitachse (fein genug, damit kein Raster hoerbar wird)
-    static constexpr int kEpochCells = 450;          // ~90 s; begrenzt die Rueckschau-Kosten
-    static constexpr int kMaxVoices = 4;              // gleichzeitig hoerbare Ereignisse
-    static constexpr float kBreathShare = 0.12f;      // Anteil der Ereignisse, die ein Atmer/Schniefer sein duerfen
-    static constexpr float kMinGapMovementSec = 0.9f; // Mindestabstand zwischen zwei Bewegungs-Ereignissen
-    static constexpr float kMinGapBreathSec = 9.0f;   // Mindestabstand zwischen zwei Atmer-Ereignissen ("wesentlich seltener")
-    static constexpr float kSafetyRampMs = 6.0f;      // kurzer Fade an Stimmbeginn/-ende (Click-Schutz zusaetzlich zu den Sample-Fades)
-    static constexpr float kLevelSmoothMs = 60.0f;    // Glaettung der LEVEL-Aenderung (kein Sprung bei Automation)
-
-    void prepare (double sampleRateIn)
+    static constexpr double kCellSeconds = .1;
+    static constexpr float kMinGapMovementSec = .32f, kMinGapBreathSec = 12.f;
+    static constexpr float kLevelSmoothMs = 60;
+    static constexpr int kMaxVoices = 32;
+    struct Event { int64_t cell = -1, start = 0; Category category = Category::movement; int index = 0; float gain = 1; double speed = 1, duration = 0; };
+    void prepare(double rate) { sampleRate=validRate(rate); cellSamples=std::max<int64_t>(1,std::llround(sampleRate*kCellSeconds)); levelCoeff=float(1-std::exp(-1/(.060*sampleRate))); reset(); }
+    void setSeed(uint32_t value) { seed=value; reset(); }
+    void setBank(std::shared_ptr<const SampleBank> value)
     {
-        sampleRate = validRate (sampleRateIn);
-        cellSamples = std::max<int64_t> (1, (int64_t) std::llround (sampleRate * (double) kCellSeconds));
-        levelSmoothCoeff = (float) (1.0 - std::exp (-1.0 / (((double) kLevelSmoothMs / 1000.0) * sampleRate)));
-        // Kapazitaet vorab reservieren: ensureEpoch() darf im Audio-Thread nicht (neu) allozieren.
-        epochEvents.reserve (kMaxEventsPerEpoch);
+        bank=std::move(value); maxDuration=0;
+        if (bank) for (const auto* pool : {&bank->movements,&bank->breaths})
+            for (const auto& c : *pool) maxDuration=std::max(maxDuration,double(c.data.size())/validRate(c.sourceRate)/.985);
         reset();
     }
-
-    void setSeed (uint32_t newSeed) { seed = newSeed; }
-
-    void setBank (std::shared_ptr<const SampleBank> newBank) { bank = std::move (newBank); }
-
-    void reset()
+    void reset() { voices={}; lastCell=-1; expectedPosition=-1; level=-1; activeMask=0; }
+    int getActiveMask() const { return activeMask; }
+    double getSampleRate() const { return sampleRate; }
+    // Safe for a UI-owned preview Engine sharing only the immutable bank.
+    bool eventAt(int64_t cell, float activity, Event& out) const
     {
-        for (auto& v : voices) v = Voice();
-        lastHandledCell = -1;
-        cachedEpoch = -1;
-        smoothedLevelLin = -1.0f;   // beim naechsten process() sofort auf den Zielwert springen
-    }
-
-    // outL/outR: bereits auf 0 vorbereitete Ausgabepuffer (die Engine ersetzt sie vollstaendig).
-    // blockStartSample: absolute Projekt-Samplepositon des ersten Samples in diesem Block
-    //   (vom Host; falls der Host keine gueltige Position liefert, uebergibt der Aufrufer
-    //   stattdessen einen intern fortlaufend gezaehlten Ersatzwert - siehe PluginProcessor).
-    void process (float* outL, float* outR, int numSamples, const Params& pIn, int64_t blockStartSample)
-    {
-        const auto p = sanitize (pIn);
-        const float targetLevelLin = dbToLin (p.levelDb);
-        if (smoothedLevelLin < 0.0f) smoothedLevelLin = targetLevelLin;
-
-        int64_t pos = std::max<int64_t> (0, blockStartSample);
-        int remaining = numSamples;
-        int outIdx = 0;
-
-        while (remaining > 0)
+        if (cell<0 || !bank) return false;
+        const Category cat=categoryAt(cell);
+        const auto& pool=cat==Category::movement ? bank->movements : bank->breaths;
+        if (pool.empty() || !eligible(cell,activity)) return false;
+        const int64_t start=startAt(cell);
+        const double gap=(cat==Category::movement ? double(kMinGapMovementSec) : double(kMinGapBreathSec))*sampleRate;
+        const int neighbours=int(std::ceil(gap/double(cellSamples)))+1;
+        const float priority=cellRandom(seed,cell,7);
+        for (int d=-neighbours; d<=neighbours; ++d)
         {
-            const int64_t cellIndex = pos / cellSamples;
-            const int64_t cellStart = cellIndex * cellSamples;
-            const int64_t cellEnd = cellStart + cellSamples;
-            const int chunk = (int) std::min<int64_t> (remaining, cellEnd - pos);
-
-            if (cellIndex != lastHandledCell)
-            {
-                lastHandledCell = cellIndex;
-                maybeSpawnEvent (cellIndex, p.movement);
-            }
-
-            for (int i = 0; i < chunk; ++i)
-            {
-                smoothedLevelLin += (targetLevelLin - smoothedLevelLin) * levelSmoothCoeff;
-                float mono = 0.0f;
-                for (auto& v : voices)
-                    if (v.active)
-                        mono += renderVoiceSample (v);
-                mono *= smoothedLevelLin;
-                outL[outIdx] = mono;
-                outR[outIdx] = mono;
-                ++outIdx;
-            }
-
-            pos += chunk;
-            remaining -= chunk;
+            const int64_t other=cell+d;
+            if (!d || other<0 || categoryAt(other)!=cat || !eligible(other,activity)) continue;
+            if (std::abs(double(startAt(other)-start))>=gap) continue;
+            const float op=cellRandom(seed,other,7);
+            if (op<priority || (op==priority && other<cell)) return false;
         }
+        out.cell=cell; out.start=start; out.category=cat;
+        out.index=std::min(int(pool.size())-1,int(cellRandom(seed,cell,2)*float(pool.size())));
+        out.gain=dbToLin(lerp(-1.5f,1.5f,cellRandom(seed,cell,4)));
+        out.speed=double(lerp(.985f,1.015f,cellRandom(seed,cell,5)));
+        const auto& clip=pool[size_t(out.index)];
+        out.duration=double(clip.data.size())/validRate(clip.sourceRate)/out.speed;
+        return true;
     }
-
+    void process(float* left,float* right,int count,const Params& input,int64_t start)
+    {
+        const auto p=sanitize(input); const float target=dbToLin(p.levelDb);
+        const bool jumped=start!=expectedPosition;
+        if (jumped) { voices={}; lastCell=-1; level=target; }
+        if (level<0) level=target;
+        activeMask=0;
+        for (int i=0;i<count;++i)
+        {
+            const int64_t pos=start+i;
+            if (pos<0) {left[i]=right[i]=0; continue;}
+            const int64_t cell=pos/cellSamples;
+            if (cell!=lastCell)
+            {
+                if (lastCell<0) reconstruct(pos,p.movement);
+                else { Event ev; if(eventAt(cell,p.movement,ev)) add(ev,pos); }
+                lastCell=cell;
+            }
+            float mono=0;
+            for (auto& voice:voices)
+            {
+                if (!voice.used) continue;
+                const auto& ev=voice.event;
+                const auto& pool=ev.category==Category::movement ? bank->movements : bank->breaths;
+                const auto& clip=pool[size_t(ev.index)];
+                const double offset=double(pos-ev.start);
+                const double duration=ev.duration*sampleRate;
+                if(offset>=duration) { voice.used=false; continue; }
+                if(offset<0) continue;
+                const double read=offset*validRate(clip.sourceRate)/sampleRate*ev.speed;
+                const float envelope=cosineFade(offset/(.025*sampleRate))*cosineFade((duration-1-offset)/(.065*sampleRate));
+                mono+=readCubic(clip.data,read)*ev.gain*envelope;
+                activeMask|=ev.category==Category::movement ? 1 : 2;
+            }
+            level+=(target-level)*levelCoeff;
+            mono*=level;
+            // Continuous soft knee, no hard clipping even with dense overlaps at +12 dB.
+            const float magnitude=std::abs(mono);
+            if(magnitude>.5f) mono=std::copysign(.5f+.39f*std::tanh((magnitude-.5f)/.39f),mono);
+            left[i]=right[i]=mono;
+        }
+        expectedPosition=start+count;
+    }
 private:
-    struct EventRecord
+    struct Voice { bool used=false; Event event; };
+    Category categoryAt(int64_t cell) const { return cellRandom(seed,cell,1)<.075f ? Category::breath : Category::movement; }
+    bool eligible(int64_t cell,float activity) const
     {
-        int64_t cell = -1;
-        Category category = Category::movement;
-        int sampleIndex = 0;
-        float levelJitterDb = 0.0f;
-        float rateMultiplier = 1.0f;
-    };
-
-    struct Voice
+        const float m=finiteClamp(activity,0,1,.4f);
+        const float probability=categoryAt(cell)==Category::breath ? lerp(.018f,.065f,m) : lerp(.006f,.95f,std::pow(m,2.4f));
+        return cellRandom(seed,cell,0)<probability;
+    }
+    int64_t startAt(int64_t cell) const { return cell*cellSamples+int64_t(cellRandom(seed,cell,3)*float(cellSamples)*.8f); }
+    void add(const Event& ev,int64_t pos)
     {
-        bool active = false;
-        const SampleClip* clip = nullptr;
-        double readPos = 0.0;
-        double rateInc = 1.0;
-        float gainLin = 1.0f;
-        int64_t sampleCounter = 0;   // seit Stimmbeginn, fuer den kurzen Einsatz-Fade
-    };
-
-    // Reine Funktion: produziert fuer eine Zelle, ausgehend vom Epochenanfang, die Liste
-    // tatsaechlich feuernder Ereignisse (mit Mindestabstaenden). Rein von (seed, epochStartCell)
-    // abhaengig - bei gleichem Seed und gleicher Epoche immer dasselbe Ergebnis.
-    void ensureEpoch (int64_t epochIndex, float fireProbability)
-    {
-        // Neu aufbauen, wenn entweder die Epoche wechselt ODER sich MOVEMENT seit dem
-        // letzten Aufbau sichtbar geaendert hat (sonst wuerde eine Live-Aenderung des
-        // Reglers bis zu ~90 s lang nichts bewirken).
-        if (epochIndex == cachedEpoch && std::abs (fireProbability - builtWithProbability) < 1.0e-6f)
+        if(double(pos-ev.start)>=ev.duration*sampleRate) return;
+        for(auto& v:voices) if(!v.used)
+        {
+            v.used=true;v.event=ev;
+            // Stable chronological summation also makes floating-point overlap sums
+            // bit-identical after reconstruction, regardless of former slot reuse.
+            std::sort(voices.begin(),voices.end(),[](const Voice& a,const Voice& b) {
+                if(a.used!=b.used) return a.used;
+                return a.used && a.event.cell<b.event.cell;
+            });
             return;
-        cachedEpoch = epochIndex;
-        builtWithProbability = fireProbability;
-        epochEvents.clear();
-
-        const int64_t epochStartCell = epochIndex * (int64_t) kEpochCells;
-        const int minGapMovement = std::max (1, (int) std::lround (kMinGapMovementSec / kCellSeconds));
-        const int minGapBreath = std::max (1, (int) std::lround (kMinGapBreathSec / kCellSeconds));
-        int64_t lastMovementCell = epochStartCell - minGapMovement - 1;
-        int64_t lastBreathCell = epochStartCell - minGapBreath - 1;
-        int lastMovementIndex = -1, lastBreathIndex = -1;
-
-        for (int i = 0; i < kEpochCells; ++i)
-        {
-            const int64_t cell = epochStartCell + i;
-            const float r0 = cellRandom (seed, cell, 0);   // Einsatzschwelle
-            if (r0 >= fireProbability) continue;
-
-            const float r1 = cellRandom (seed, cell, 1);   // Kategorie
-            const bool wantBreath = r1 < kBreathShare;
-            const Category cat = wantBreath ? Category::breath : Category::movement;
-
-            if (cat == Category::movement)
-            {
-                if (cell - lastMovementCell < minGapMovement) continue;
-            }
-            else
-            {
-                if (cell - lastBreathCell < minGapBreath) continue;
-            }
-            if (movementCount == 0 && cat == Category::movement) continue;
-            if (breathCount == 0 && cat == Category::breath) continue;
-
-            EventRecord ev;
-            ev.cell = cell;
-            ev.category = cat;
-            const int poolSize = cat == Category::movement ? movementCount : breathCount;
-            int& lastIndex = cat == Category::movement ? lastMovementIndex : lastBreathIndex;
-            int idx = (int) (cellRandom (seed, cell, 2) * (float) poolSize);
-            idx = std::clamp (idx, 0, poolSize - 1);
-            if (poolSize > 1 && idx == lastIndex) idx = (idx + 1) % poolSize;
-            lastIndex = idx;
-            ev.sampleIndex = idx;
-            ev.levelJitterDb = lerp (-1.5f, 1.5f, cellRandom (seed, cell, 4));
-            ev.rateMultiplier = lerp (0.985f, 1.015f, cellRandom (seed, cell, 5));
-
-            if (cat == Category::movement) lastMovementCell = cell; else lastBreathCell = cell;
-
-            if ((int) epochEvents.size() < kMaxEventsPerEpoch)
-                epochEvents.push_back (ev);
         }
     }
-
-    void maybeSpawnEvent (int64_t cellIndex, float movementParam)
+    void reconstruct(int64_t pos,float activity)
     {
-        movementCount = bank ? (int) bank->movements.size() : 0;
-        breathCount = bank ? (int) bank->breaths.size() : 0;
-        if (movementCount == 0 && breathCount == 0) return;
-
-        const float fireProbability = lerp (0.012f, 0.32f, movementParam);
-        ensureEpoch (cellIndex / (int64_t) kEpochCells, fireProbability);
-
-        for (const auto& ev : epochEvents)
-        {
-            if (ev.cell != cellIndex) continue;
-            const auto& pool = ev.category == Category::movement ? bank->movements : bank->breaths;
-            if (ev.sampleIndex < 0 || ev.sampleIndex >= (int) pool.size()) return;
-            startVoice (pool[(size_t) ev.sampleIndex], ev);
-            return;   // hoechstens ein neues Ereignis pro Zelle
-        }
+        voices={}; const int64_t cell=pos/cellSamples;
+        const int64_t lookback=int64_t(std::ceil(maxDuration/kCellSeconds))+1;
+        for(int64_t c=std::max<int64_t>(0,cell-lookback);c<=cell;++c) {Event ev;if(eventAt(c,activity,ev))add(ev,pos);}
     }
-
-    void startVoice (const SampleClip& clip, const EventRecord& ev)
+    static float readCubic(const std::vector<float>& y,double pos)
     {
-        Voice* slot = nullptr;
-        for (auto& v : voices)
-            if (! v.active) { slot = &v; break; }
-        if (slot == nullptr) return;   // alle Stimmen belegt: Ereignis faellt still aus (Polyphonie bewusst begrenzt)
-
-        *slot = Voice();
-        slot->active = true;
-        slot->clip = &clip;
-        slot->readPos = 0.0;
-        const double clipRate = clip.sourceRate > 0.0 ? clip.sourceRate : sampleRate;
-        slot->rateInc = (clipRate / sampleRate) * (double) ev.rateMultiplier;
-        slot->gainLin = dbToLin (ev.levelJitterDb);
+        if(y.empty()) return 0;
+        const int n=int(y.size()),i=int(pos);const float f=float(pos-double(i));
+        auto at=[&](int k){return y[size_t(std::clamp(k,0,n-1))];};
+        const float a=at(i-1),b=at(i),c=at(i+1),d=at(i+2);
+        return ((.5f*(d-a)+1.5f*(b-c))*f+(a-2.5f*b+2*c-.5f*d))*f*f+.5f*(c-a)*f+b;
     }
-
-    // kubische Interpolation (Catmull-Rom), gleicher Stil wie in anderen Stromschlag-DSP-Engines
-    static float readCubic (const std::vector<float>& y, double pos)
-    {
-        const int n = (int) y.size();
-        if (n == 0) return 0.0f;
-        const int i = (int) pos;
-        const float f = (float) (pos - (double) i);
-        auto at = [&] (int k) { return y[(size_t) std::clamp (k, 0, n - 1)]; };
-        const float ym1 = at (i - 1), y0 = at (i), y1 = at (i + 1), y2 = at (i + 2);
-        const float c1 = 0.5f * (y1 - ym1);
-        const float c2 = ym1 - 2.5f * y0 + 2.0f * y1 - 0.5f * y2;
-        const float c3 = 0.5f * (y2 - ym1) + 1.5f * (y0 - y1);
-        return ((c3 * f + c2) * f + c1) * f + y0;
-    }
-
-    float renderVoiceSample (Voice& v)
-    {
-        if (v.clip == nullptr || v.clip->data.empty()) { v.active = false; return 0.0f; }
-        if (v.readPos >= (double) v.clip->data.size() - 2.0) { v.active = false; return 0.0f; }
-
-        float s = readCubic (v.clip->data, v.readPos) * v.gainLin;
-
-        // kurzer zusaetzlicher Sicherheits-Fade am Stimmbeginn (die Samples haben zwar schon
-        // eigene Fades, das hier schuetzt zusaetzlich vor jeglichem Rest-Klick bei Stimmstart)
-        const int safetySamples = std::max (1, (int) std::lround ((double) kSafetyRampMs / 1000.0 * sampleRate));
-        if (v.sampleCounter < safetySamples)
-            s *= (float) v.sampleCounter / (float) safetySamples;
-        ++v.sampleCounter;
-
-        v.readPos += v.rateInc;
-        return s;
-    }
-
-    static constexpr int kMaxEventsPerEpoch = 96;
-
-    double sampleRate = 48000.0;
-    int64_t cellSamples = 16800;
-    uint32_t seed = 0x4D6F7665u;   // "Move" als Start-Seed; per setSeed() veraenderbar
     std::shared_ptr<const SampleBank> bank;
-
-    int64_t lastHandledCell = -1;
-    int64_t cachedEpoch = -1;
-    float builtWithProbability = -1.0f;
-    int movementCount = 0, breathCount = 0;
-    std::vector<EventRecord> epochEvents;
-
-    std::array<Voice, kMaxVoices> voices {};
-    float smoothedLevelLin = -1.0f;
-    float levelSmoothCoeff = 0.01f;
+    std::array<Voice,kMaxVoices> voices {};
+    uint32_t seed=0x4D6F7665u;
+    double sampleRate=48000,maxDuration=0;
+    int64_t cellSamples=4800,lastCell=-1,expectedPosition=-1;
+    float level=-1,levelCoeff=.0003f;
+    int activeMask=0;
 };
-
 } // namespace mv
