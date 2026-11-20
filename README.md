@@ -60,7 +60,7 @@ sehr leiser Atemhauch oder ein Nasengeräusch.
 ## Installation (Windows)
 
 1. Über den Download-Link oben `Moves-VST3-Windows.zip` bzw. die Release-ZIP laden.
-2. ZIP entpacken und den **ganzen Ordner** `MOVES.vst3` nach `C:\Program Files\Common Files\VST3` kopieren.
+2. ZIP entpacken und den **ganzen Ordner** `Moves.vst3` nach `C:\Program Files\Common Files\VST3` kopieren.
 3. DAW neu starten bzw. Plugins neu scannen. Primär getestete Zielumgebung: Studio One Pro 8 unter Windows.
 
 ## Unterstützte Plattformen und Formate
@@ -91,6 +91,7 @@ ctest --test-dir build-dsp --output-on-failure
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Versionsschema und
 Release-Ablauf: [docs/VERSIONING.md](docs/VERSIONING.md).
 
+- **1.1** – Der Plugin-Ordner heißt jetzt `Moves.vst3` (wie bei den anderen Plugins, vorher `MOVES.vst3`); Klang und gespeicherte Projekte unverändert. [Release-Hinweise](docs/releases/1.1.md).
 - **1.0** – Erste Version. [Release-Hinweise](docs/releases/1.0.md).
 
 ## Aufbau
