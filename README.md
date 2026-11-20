@@ -91,7 +91,7 @@ ctest --test-dir build-dsp --output-on-failure
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Versionsschema und
 Release-Ablauf: [docs/VERSIONING.md](docs/VERSIONING.md).
 
-- **1.1** – Der Plugin-Ordner heißt jetzt `Moves.vst3` (wie bei den anderen Plugins, vorher `MOVES.vst3`); Klang und gespeicherte Projekte unverändert. [Release-Hinweise](docs/releases/1.1.md).
+- **1.1** – Der Plugin-Ordner heißt jetzt `Moves.vst3` (wie bei den anderen Plugins, vorher `MOVES.vst3`); Hilfetext mit richtigen Umlauten; Klang und gespeicherte Projekte unverändert. [Release-Hinweise](docs/releases/1.1.md).
 - **1.0** – Erste Version. [Release-Hinweise](docs/releases/1.0.md).
 
 ## Aufbau
