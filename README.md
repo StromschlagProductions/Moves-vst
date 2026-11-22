@@ -23,11 +23,22 @@ kurz ausschaltet.
 
 – Lars Eickstädt, Stromschlag Audio
 
+**Aktuelle Version: 1.2** · [Änderungen und Prüfstand](docs/releases/1.2.md)
+
 ## Oberfläche
 
 Oben links Logo und Name, rechts Dunkel/Hell und die Hilfe (**?**). Darunter die Ereignis-
 und Pegelanzeige sowie eine kompakte Karte mit den beiden Reglern. Farbschema und
 Fenstergröße (50–300 %) werden mit dem Projekt gespeichert.
+
+![MOVES 1.2 – dunkle Oberfläche mit Ereignisvorschau und Reglern in Radiophone-Größe](docs/oberflaeche-dunkel.png)
+
+<details>
+<summary>Helle Oberfläche ansehen</summary>
+
+![MOVES 1.2 – helle Oberfläche](docs/oberflaeche-hell.png)
+
+</details>
 
 ## Regler (automatisierbar)
 
