@@ -131,6 +131,73 @@ int main()
         std::cout << "OK: ohne Samplebibliothek bleibt die Ausgabe stumm\n";
     }
 
+    // Long samples make seek tests meaningful: jumps inside attacks, tails and cells,
+    // both sides of the former epoch boundary, negative preroll and same-cell loops.
+    {
+        auto longBank = std::make_shared<mv::SampleBank>();
+        longBank->movements.push_back (makeClip (110000, 123));
+        longBank->breaths.push_back (makeClip (76000, 456));
+        mv::Params p; p.movement = 1;
+        mv::Engine full; full.prepare (48000); full.setBank (longBank);
+        std::vector<float> l, r;
+        renderRange (full, p, 0, 48000 * 94, l, r, 777);
+        for (int64_t start : { int64_t(123), int64_t(341280), int64_t(48000*89+17), int64_t(48000*90+31) })
+        {
+            mv::Engine seek; seek.prepare (48000); seek.setBank (longBank);
+            std::vector<float> a, b;
+            renderRange (seek, p, start, 48000, a, b, 193);
+            for (size_t i=0; i<a.size(); ++i) CHECK (a[i] == l[size_t(start)+i]);
+            renderRange (seek, p, start, 48000, a, b, 511);
+            for (size_t i=0; i<a.size(); ++i) CHECK (a[i] == l[size_t(start)+i]);
+        }
+        mv::Engine loop; loop.prepare (48000); loop.setBank (longBank);
+        std::vector<float> a,b,c,d;
+        renderRange (loop,p,123,2400,a,b,512);
+        renderRange (loop,p,123,2400,c,d,31);
+        CHECK (a == c);
+        mv::Engine pre; pre.prepare (48000); pre.setBank (longBank);
+        renderRange (pre,p,-1000,2000,a,b,137);
+        for (int i=0;i<1000;++i) CHECK (a[size_t(i)] == 0);
+        for (int i=0;i<1000;++i) CHECK (a[size_t(i+1000)] == l[size_t(i)]);
+        std::cout << "OK: lange Ausklaenge, beliebige Spruenge, kurze Loops und negativer Vorlauf\n";
+    }
+    // Minimum distances apply globally, including across arbitrary 90-second marks.
+    {
+        mv::Engine e; e.prepare (48000); e.setBank (bank);
+        int64_t lastMove=-1000000000, lastBreath=lastMove;
+        int lowCount=0, highCount=0;
+        for (int64_t cell=0;cell<36000;++cell)
+        {
+            mv::Engine::Event ev;
+            if (e.eventAt(cell,0,ev)) ++lowCount;
+            if (!e.eventAt(cell,1,ev)) continue;
+            ++highCount;
+            auto& last=ev.category==mv::Category::movement ? lastMove : lastBreath;
+            const double gap=ev.category==mv::Category::movement ? mv::Engine::kMinGapMovementSec : mv::Engine::kMinGapBreathSec;
+            CHECK (double(ev.start-last)+.01 >= gap*48000);
+            last=ev.start;
+        }
+        CHECK (highCount > lowCount*5);
+        std::cout << "OK: globale Mindestabstaende und deutlich nutzbarer Aktivitaetsbereich\n";
+    }
+    // Isolated impacts must have a lower crest after conditioning, finite audio and
+    // genuinely soft endpoints. Quiet movements gain a usable internal reference level.
+    {
+        auto clip=makeClip(48000,77);
+        for(auto& v:clip.data) v*=.01f;
+        clip.data[24000]=.8f;
+        auto crest=[](const std::vector<float>& x) { double sum=0;float peak=0;for(float v:x){sum+=double(v)*v;peak=std::max(peak,std::abs(v));}return peak/std::sqrt(sum/double(x.size())); };
+        const double before=crest(clip.data);
+        mv::conditionClip(clip,mv::Category::movement);
+        CHECK (crest(clip.data)<before*.5);
+        CHECK (crest(clip.data)<8.0); // below 18.1 dB crest, not just quieter than the source
+        float bodyPeak=0;
+        for(size_t i=0;i<clip.data.size();++i) if(i!=24000) bodyPeak=std::max(bodyPeak,std::abs(clip.data[i]));
+        CHECK (std::abs(clip.data[24000])<bodyPeak); // isolated impulse no longer dominates
+        CHECK (clip.data.front()==0 && clip.data.back()==0);
+        for(float v:clip.data) CHECK (std::isfinite(v) && std::abs(v)<=mv::dbToLin(-16.f)+1e-6f);
+        std::cout << "OK: impulsarme Sampleaufbereitung, weiche Raender, begrenzter Pegel\n";
+    }
     std::cout << "Alle MOVES-DSP-Tests erfolgreich.\n";
     return 0;
 }

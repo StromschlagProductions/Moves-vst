@@ -46,6 +46,24 @@ public:
     }
 };
 
+class EventDisplay : public juce::Component
+{
+public:
+    explicit EventDisplay (MovesProcessor& p) : processor (p) { preview.prepare (48000); preview.setBank (p.getSampleBank()); lastSeed=p.getSequenceSeed(); preview.setSeed(lastSeed); }
+    void colours (juce::Colour background, juce::Colour foreground, juce::Colour muted, juce::Colour highlight, juce::Colour border)
+    { bg=background; text=foreground; dim=muted; accent=highlight; line=border; }
+    void refresh();
+    void paint (juce::Graphics&) override;
+private:
+    MovesProcessor& processor;
+    mv::Engine preview;
+    juce::Colour bg, text, dim, accent, line;
+    uint64_t lastCounter=0;
+    uint32_t lastSeed=0;
+    float meter=0;
+    int mask=0, idle=0;
+};
+
 class MovesEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
@@ -81,6 +99,7 @@ private:
     juce::Image logo;
 
     Knob movement, level;
+    EventDisplay events { processor };
     juce::Label libraryStatus;
 
     juce::TextButton themeButton;

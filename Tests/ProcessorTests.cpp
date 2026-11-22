@@ -57,6 +57,8 @@ int main()
     // muss dasselbe Ergebnis liefern (faengt Offset-/Kopierfehler beim Chunking ab).
     {
         MovesProcessor a, b;
+        juce::MemoryBlock shared; a.getStateInformation (shared);
+        b.setStateInformation (shared.getData(), (int) shared.getSize());
         a.prepareToPlay (48000, 16); b.prepareToPlay (48000, 16);
         parameter (a, "movement", 0.8f); parameter (b, "movement", 0.8f);
         const int total = 65537;
@@ -120,6 +122,73 @@ int main()
         std::cout << "OK: mehrere Instanzen gleichzeitig, unabhaengig voneinander\n";
     }
 
+    // Real editor actions, not direct assignment of persistence fields.
+    {
+        MovesProcessor a;
+        auto* activity=a.apvts.getParameter("movement");
+        CHECK (std::abs(activity->convertFrom0to1(activity->getValueForText("40 %"))-.4f)<1e-5f);
+        auto* level=a.apvts.getParameter("level");
+        CHECK (std::abs(level->convertFrom0to1(level->getValueForText("-18,5 dB"))+18.5f)<.01f);
+        std::unique_ptr<juce::AudioProcessorEditor> editor(a.createEditor());
+        editor->setSize(900,556);
+        std::function<void(juce::Component&)> clickTheme=[&](juce::Component& c) {
+            if(auto* b=dynamic_cast<juce::TextButton*>(&c)) if(b->getButtonText()=="Dunkel") { b->onClick(); return; }
+            for(auto* child:c.getChildren()) clickTheme(*child);
+        };
+        clickTheme(*editor);
+        juce::MemoryBlock state;a.getStateInformation(state);
+        MovesProcessor b;b.setStateInformation(state.getData(),int(state.getSize()));
+        std::unique_ptr<juce::AudioProcessorEditor> restored(b.createEditor());
+        CHECK (restored->getWidth()==900 && b.uiTheme.load()==1);
+        CHECK (a.getSequenceSeed()==b.getSequenceSeed());
+        std::cout << "OK: Texteingabe, echte GUI-Aenderung und gespeicherte Instanzfolge\n";
+    }
+    // Independent instances must actually sound different; a saved copy must match.
+    {
+        MovesProcessor a,b,c;
+        CHECK (a.getSequenceSeed()!=b.getSequenceSeed());
+        juce::MemoryBlock state;a.getStateInformation(state);
+        c.setStateInformation(state.getData(),int(state.getSize()));
+        for(auto* p:{&a,&b,&c}) {parameter(*p,"movement",1);p->prepareToPlay(48000,512);}
+        bool different=false, audible=false;
+        for(int n=0;n<1000;++n)
+        {
+            juce::AudioBuffer<float> x(2,512),y(2,512),z(2,512);
+            a.processBlock(x,midi);b.processBlock(y,midi);c.processBlock(z,midi);
+            for(int i=0;i<512;++i) {CHECK(x.getSample(0,i)==z.getSample(0,i));different|=x.getSample(0,i)!=y.getSample(0,i);audible|=x.getSample(0,i)!=0;}
+        }
+        CHECK(different && audible);
+        std::cout << "OK: unabhaengige Instanzen, gespeicherte Kopie bitidentisch\n";
+    }
+    // Host-position integration with the real embedded library (including conditioning).
+    {
+        struct Head : juce::AudioPlayHead {
+            int64_t sample=0;
+            juce::Optional<PositionInfo> getPosition() const override {PositionInfo p;p.setTimeInSamples(sample);p.setIsPlaying(true);return p;}
+        };
+        MovesProcessor a,b; Head ha,hb;
+        parameter(a,"movement",1);
+        juce::MemoryBlock state;a.getStateInformation(state);b.setStateInformation(state.getData(),int(state.getSize()));
+        a.setPlayHead(&ha);b.setPlayHead(&hb);
+        a.prepareToPlay(48000,512);b.prepareToPlay(48000,512);
+        std::vector<float> reference(48000*12);
+        for(int offset=0;offset<int(reference.size());offset+=512)
+        {
+            const int n=std::min(512,int(reference.size())-offset);
+            juce::AudioBuffer<float> audio(2,n);ha.sample=offset;a.processBlock(audio,midi);
+            std::copy(audio.getReadPointer(0),audio.getReadPointer(0)+n,reference.begin()+offset);
+        }
+        for(int64_t start:{int64_t(341280),int64_t(123),int64_t(341280)})
+        {
+            for(int offset=0;offset<48000;offset+=193)
+            {
+                const int n=std::min(193,48000-offset);juce::AudioBuffer<float> audio(2,n);
+                hb.sample=start+offset;b.processBlock(audio,midi);
+                for(int i=0;i<n;++i)CHECK(audio.getSample(0,i)==reference[size_t(start+offset+i)]);
+            }
+        }
+        std::cout << "OK: echte Hostposition und Samplebibliothek nach Spruengen bitidentisch\n";
+    }
     std::cout << "Alle MOVES-Processor-Tests erfolgreich.\n";
     return 0;
 }
