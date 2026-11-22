@@ -141,7 +141,7 @@ void MovesEditor::setupKnob (Knob& k, const juce::String& paramId, const juce::S
     // nur senkrecht ziehen (wie bei den meisten Plugins): hoch = mehr, runter = weniger
     k.slider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
     k.slider.setMouseDragSensitivity (180);
-    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 90, 18);
+    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 18);
     content.addAndMakeVisible (k.slider);
     k.label.setText (text, juce::dontSendNotification);
     k.label.setJustificationType (juce::Justification::centred);
@@ -182,10 +182,10 @@ void MovesEditor::paint (juce::Graphics& g)
     g.drawText (u8 ("STROMSCHLAG AUDIO  \xc2\xb7  v" PLUGIN_VERSION_TEXT), 80, 36, 300, 16, juce::Justification::centredLeft);
 
     g.setColour (theme.panel);
-    g.fillRoundedRectangle (12.0f, 278.0f, 656.0f, 126.0f, 8.0f);
+    g.fillRoundedRectangle (12.0f, 248.0f, 656.0f, 156.0f, 8.0f);
     g.setColour (theme.line);
-    g.drawRoundedRectangle (12.5f, 278.5f, 655.0f, 125.0f, 8.0f, 1.0f);
-    g.drawVerticalLine (340, 296.0f, 376.0f);
+    g.drawRoundedRectangle (12.5f, 248.5f, 655.0f, 155.0f, 8.0f, 1.0f);
+    g.drawVerticalLine (340, 266.0f, 380.0f);
 
 }
 
@@ -207,15 +207,17 @@ void MovesEditor::resized()
     helpScroll.setBounds (12, 84, w - 24, 320);
     helpText.setWidth (helpScroll.getMaximumVisibleWidth());
 
-    events.setBounds (12, 84, w - 24, 180);
+    events.setBounds (12, 84, w - 24, 154);
     auto placeKnob = [] (Knob& k, int x)
     {
-        k.label.setBounds (x, 292, 220, 18);
-        k.slider.setBounds (x + 30, 311, 160, 74);
+        k.label.setBounds (x, 256, 220, 18);
+        // Same 110 x 112 slider bounds and 80 x 18 value box as Radiophone's
+        // rotary control: preserve the shared JUCE V4 arc/thumb proportions.
+        k.slider.setBounds (x + 55, 274, 110, 112);
     };
     placeKnob (movement, 66);
     placeKnob (level, 394);
-    libraryStatus.setBounds (24, 386, w - 48, 14);
+    libraryStatus.setBounds (24, 388, w - 48, 14);
     helpScroll.toFront (false);
 }
 
@@ -242,7 +244,7 @@ void EventDisplay::paint(juce::Graphics& g)
     const juce::String status=mask==3 ? u8("Bewegung + Atemgeräusch") : mask==1 ? "Bewegung" : mask==2 ? u8("Atemgeräusch") : "Ruhephase";
     g.setColour(text);g.setFont(juce::FontOptions(12));
     g.drawText(status,getWidth()-300,10,282,20,juce::Justification::centredRight);
-    const float x0=108, x1=float(getWidth()-20), y0=58, y1=96;
+    const float x0=108, x1=float(getWidth()-20), y0=52, y1=82;
     const double now=processor.getDisplayPosition(), begin=now-3, span=8;
     auto x=[&](double t){return x0+float((t-begin)/span)*(x1-x0);};
     g.setColour(dim);g.setFont(juce::FontOptions(11));
@@ -250,13 +252,13 @@ void EventDisplay::paint(juce::Graphics& g)
     g.drawText(u8("Atem/Nase"),16,int(y1)-8,86,18,juce::Justification::centredLeft);
     for(int i=-3;i<=5;++i)
     {
-        const float px=x(now+i);g.setColour(line);g.drawVerticalLine(int(px),40,118);
-        if(i!=0) {g.setColour(dim);g.drawText(juce::String(i)+" s",int(px)-18,119,36,15,juce::Justification::centred);}
+        const float px=x(now+i);g.setColour(line);g.drawVerticalLine(int(px),38,100);
+        if(i!=0) {g.setColour(dim);g.drawText(juce::String(i)+" s",int(px)-18,101,36,15,juce::Justification::centred);}
     }
     const float activity=processor.apvts.getRawParameterValue("movement")->load();
     const int64_t first=std::max<int64_t>(0,int64_t(std::floor((begin-4)/mv::Engine::kCellSeconds)));
     const int64_t last=int64_t(std::ceil((begin+span)/mv::Engine::kCellSeconds));
-    g.saveState();g.reduceClipRegion(int(x0),38,int(x1-x0),76);
+    g.saveState();g.reduceClipRegion(int(x0),38,int(x1-x0),62);
     for(int64_t cell=first;cell<=last;++cell)
     {
         mv::Engine::Event ev;if(!preview.eventAt(cell,activity,ev))continue;
@@ -270,12 +272,12 @@ void EventDisplay::paint(juce::Graphics& g)
         g.setColour(colour.withAlpha(start<=now&&start+ev.duration>now?.95f:.42f));
         g.fillRoundedRectangle(px,cy-6,width,12,5);
     }
-    g.restoreState();g.setColour(text.withAlpha(.9f));g.drawVerticalLine(int(x(now)),38,118);
-    g.setFont(juce::FontOptions(10));g.drawText("JETZT",int(x(now))-25,119,50,15,juce::Justification::centred);
+    g.restoreState();g.setColour(text.withAlpha(.9f));g.drawVerticalLine(int(x(now)),38,100);
+    g.setFont(juce::FontOptions(10));g.drawText("JETZT",int(x(now))-25,101,50,15,juce::Justification::centred);
     const float db=meter>1e-5f?juce::Decibels::gainToDecibels(meter):-100;
-    g.setColour(dim);g.drawText("AUSGANG",16,149,82,16,juce::Justification::centredLeft);
-    auto bar=juce::Rectangle<float>(x0,153,x1-x0-82,6);
+    g.setColour(dim);g.drawText("AUSGANG",16,127,82,16,juce::Justification::centredLeft);
+    auto bar=juce::Rectangle<float>(x0,133,x1-x0-82,6);
     g.setColour(line);g.fillRoundedRectangle(bar,3);
     g.setColour(accent);g.fillRoundedRectangle(bar.withWidth(bar.getWidth()*juce::jlimit(0.f,1.f,(db+60)/60)),3);
-    g.setColour(text);g.drawText(db<=-60?u8("< −60 dBFS"):juce::String(db,1).replaceCharacter('.',',')+" dBFS",getWidth()-108,145,88,20,juce::Justification::centredRight);
+    g.setColour(text);g.drawText(db<=-60?u8("< −60 dBFS"):juce::String(db,1).replaceCharacter('.',',')+" dBFS",getWidth()-108,123,88,20,juce::Justification::centredRight);
 }
