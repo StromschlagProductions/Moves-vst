@@ -190,6 +190,10 @@ int main()
         const double before=crest(clip.data);
         mv::conditionClip(clip,mv::Category::movement);
         CHECK (crest(clip.data)<before*.5);
+        CHECK (crest(clip.data)<8.0); // below 18.1 dB crest, not just quieter than the source
+        float bodyPeak=0;
+        for(size_t i=0;i<clip.data.size();++i) if(i!=24000) bodyPeak=std::max(bodyPeak,std::abs(clip.data[i]));
+        CHECK (std::abs(clip.data[24000])<bodyPeak); // isolated impulse no longer dominates
         CHECK (clip.data.front()==0 && clip.data.back()==0);
         for(float v:clip.data) CHECK (std::isfinite(v) && std::abs(v)<=mv::dbToLin(-16.f)+1e-6f);
         std::cout << "OK: impulsarme Sampleaufbereitung, weiche Raender, begrenzter Pegel\n";

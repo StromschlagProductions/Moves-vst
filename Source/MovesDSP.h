@@ -65,7 +65,7 @@ inline void conditionClip(SampleClip& clip, Category category)
     for (size_t i = 0; i < x.size(); ++i)
     {
         e = std::max(envelope[i], e*release);
-        const float desired = e > threshold ? std::pow(threshold/e, .75f) : 1;
+        const float desired = e > threshold ? std::pow(threshold/e, 1.5f) : 1;
         gain += (desired-gain)*smoothing;
         const double fadeIn = std::min(.035*rate, double(x.size())*.2);
         const double fadeOut = std::min(.080*rate, double(x.size())*.25);
