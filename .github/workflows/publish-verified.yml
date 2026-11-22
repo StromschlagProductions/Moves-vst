@@ -1,0 +1,73 @@
+name: Geprüfte MOVES 1.2 veröffentlichen
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: moves-verified-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Moves-VST3-Windows
+          path: verified-artifact
+          repository: ${{ github.repository }}
+          run-id: 45015286092
+          github-token: ${{ github.token }}
+      - name: Geprüften Build und Paket validieren
+        shell: python
+        run: |
+          import hashlib, json, pathlib, re, struct, subprocess, zipfile
+          source = '96d9f412dc430731ef52e6a207efe55a57176d2a'
+          run = json.loads(subprocess.check_output(['gh','api','repos/StromschlagProductions/Moves-vst/actions/runs/45015286092']))
+          assert run['status'] == 'completed' and run['conclusion'] == 'success' and run['head_sha'] == source
+          subprocess.run(['git','fetch','--depth','1','origin',source],check=True)
+          paths = ['CMakeLists.txt','VERSION','Source','Assets','Tests','.github/workflows/build.yml','.github/workflows/tests.yml']
+          changed = subprocess.check_output(['git','diff','--name-only',source,'HEAD','--',*paths],text=True)
+          assert not changed, 'Laufzeit-/Buildquellen weichen vom geprüften Build ab: '+changed
+          version = pathlib.Path('VERSION').read_text().strip()
+          assert version == '1.2'
+          assert json.loads(pathlib.Path('docs/screenshots.json').read_text())['version'] == version
+          bundle = pathlib.Path('verified-artifact/Moves.vst3')
+          native = bundle/'Contents/x86_64-win/Moves.vst3'
+          data = native.read_bytes()
+          assert hashlib.sha256(data).hexdigest() == '3200948674d9aa871a05c8efcbeeea9730d5be54c71662b982d6ae4f98277858'
+          pe = struct.unpack_from('<I',data,60)[0]
+          assert data[pe:pe+4] == b'PE\0\0' and struct.unpack_from('<H',data,pe+4)[0] == 0x8664
+          info = (bundle/'Contents/Resources/moduleinfo.json').read_text(encoding='utf-8-sig')
+          metadata = json.loads(re.sub(r',\s*([}\]])',r'\1',info))
+          assert re.fullmatch(r'1\.2(?:\.0){0,2}',metadata['Version']) and 'Stromschlag Audio' in info
+          package = pathlib.Path('Moves-v1.2-Windows-VST3.zip')
+          with zipfile.ZipFile(package,'w',zipfile.ZIP_DEFLATED) as z:
+              for p in sorted(bundle.rglob('*')):
+                  if p.is_file(): z.write(p,p.relative_to(bundle.parent))
+          with zipfile.ZipFile(package) as z:
+              names=z.namelist()
+              assert z.testzip() is None and {n.split('/')[0] for n in names} == {'Moves.vst3'}
+              assert len(names) == len(set(n.lower() for n in names)) and not any(n.lower().endswith('.zip') for n in names)
+          assets = [package,pathlib.Path('docs/screenshots.json'),pathlib.Path('docs/oberflaeche-dunkel.png'),pathlib.Path('docs/oberflaeche-hell.png')]
+          pathlib.Path('SHA256SUMS.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in assets))
+          notes=pathlib.Path('docs/releases/1.2.md').read_text()
+          for name in ['oberflaeche-dunkel.png','oberflaeche-hell.png']:
+              notes=notes.replace('../'+name,'https://raw.githubusercontent.com/StromschlagProductions/Moves-vst/v1.2/docs/'+name)
+          notes+='\n## Bedienoberfläche\n\n![MOVES 1.2](https://raw.githubusercontent.com/StromschlagProductions/Moves-vst/v1.2/docs/oberflaeche-dunkel.png)\n\n[Dokumentation und Anleitung](https://github.com/StromschlagProductions/Moves-vst/blob/v1.2/README.md)\n'
+          pathlib.Path('release-body.txt').write_text(notes)
+      - name: Release vollständig hochladen und veröffentlichen
+        shell: bash
+        run: |
+          if gh release view v1.2 --repo "$GITHUB_REPOSITORY" --json isDraft > release-status.json; then
+            python -c 'import json; assert json.load(open("release-status.json"))["isDraft"], "Release bereits veröffentlicht: kein Überschreiben"'
+          else
+            gh release create v1.2 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "MOVES v1.2" --notes-file release-body.txt --draft
+          fi
+          gh release upload v1.2 Moves-v1.2-Windows-VST3.zip docs/screenshots.json docs/oberflaeche-dunkel.png docs/oberflaeche-hell.png SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit v1.2 --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "MOVES v1.2" --notes-file release-body.txt --draft=false --latest
