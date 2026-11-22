@@ -23,7 +23,7 @@ kurz ausschaltet.
 
 – Lars Eickstädt, Stromschlag Audio
 
-**Aktuelle Version: 1.2** · [Änderungen und Prüfstand](docs/releases/1.2.md)
+**Aktuelle Version: 1.3** · [Änderungen und Prüfstand](docs/releases/1.3.md)
 
 ## Oberfläche
 
@@ -31,12 +31,12 @@ Oben links Logo und Name, rechts Dunkel/Hell und die Hilfe (**?**). Darunter die
 und Pegelanzeige sowie eine kompakte Karte mit den beiden Reglern. Farbschema und
 Fenstergröße (50–300 %) werden mit dem Projekt gespeichert.
 
-![MOVES 1.2 – dunkle Oberfläche mit Ereignisvorschau und Reglern in Radiophone-Größe](docs/oberflaeche-dunkel.png)
+![MOVES 1.3 – dunkle Oberfläche mit Ereignisvorschau und Reglern in Radiophone-Größe](docs/oberflaeche-dunkel.png)
 
 <details>
 <summary>Helle Oberfläche ansehen</summary>
 
-![MOVES 1.2 – helle Oberfläche](docs/oberflaeche-hell.png)
+![MOVES 1.3 – helle Oberfläche](docs/oberflaeche-hell.png)
 
 </details>
 
@@ -123,9 +123,9 @@ ctest --test-dir build-dsp --output-on-failure
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Versionsschema und
 Release-Ablauf: [docs/VERSIONING.md](docs/VERSIONING.md).
 
-- **1.1** – Der Plugin-Ordner heißt jetzt `Moves.vst3` (wie bei den anderen Plugins, vorher `MOVES.vst3`); Hilfetext mit richtigen Umlauten; Klang und gespeicherte Projekte unverändert. [Release-Hinweise](docs/releases/1.1.md).
+- **1.3** – Korrektur der Anzeige: Umlaute in den Reglerbeschriftungen und in den Parameternamen werden richtig dargestellt, der Untertitel „Audio Drama Presence Simulator“ steht wieder im Kopf. Klang unverändert gegenüber 1.2. [Release-Hinweise](docs/releases/1.3.md).
 - **1.2** – Neue Abstimmung, Anzeige und Funktionskorrekturen. [Details und Grenzen](docs/releases/1.2.md).
-- **1.1** – Angepasste Schreibweise `Moves.vst3`, deutsche Hilfe.
+- **1.1** – Der Plugin-Ordner heißt jetzt `Moves.vst3` (wie bei den anderen Plugins, vorher `MOVES.vst3`); Hilfetext mit richtigen Umlauten; Klang und gespeicherte Projekte unverändert. [Release-Hinweise](docs/releases/1.1.md).
 - **1.0** – Erste Version. [Release-Hinweise](docs/releases/1.0.md).
 
 ## Aufbau

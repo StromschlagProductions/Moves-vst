@@ -55,8 +55,8 @@ MovesEditor::MovesEditor (MovesProcessor& p) : AudioProcessorEditor (&p), proces
     theme = processor.uiTheme.load() == 1 ? lightTheme() : darkTheme();
     setLookAndFeel (&look);
 
-    setupKnob (movement, "movement", "AKTIVITÄT");
-    setupKnob (level, "level", "LAUTSTÄRKE");
+    setupKnob (movement, "movement", u8 ("AKTIVITÄT"));
+    setupKnob (level, "level", u8 ("LAUTSTÄRKE"));
 
     content.addAndMakeVisible (events);
     libraryStatus.setJustificationType (juce::Justification::centred);
@@ -176,7 +176,7 @@ void MovesEditor::paint (juce::Graphics& g)
     g.drawText ("MOVES", 80, 8, 110, 30, juce::Justification::centredLeft);
     g.setColour (theme.accent);
     g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
-    g.drawText ("BEWEGUNG & PRÄSENZ", 188, 15, 330, 22, juce::Justification::centredLeft);
+    g.drawText ("AUDIO DRAMA PRESENCE SIMULATOR", 188, 15, 330, 22, juce::Justification::centredLeft);
     g.setColour (theme.dim);
     g.setFont (juce::FontOptions (11.0f));
     g.drawText (u8 ("STROMSCHLAG AUDIO  \xc2\xb7  v" PLUGIN_VERSION_TEXT), 80, 36, 300, 16, juce::Justification::centredLeft);

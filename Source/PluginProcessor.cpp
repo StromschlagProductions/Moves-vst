@@ -21,12 +21,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MovesProcessor::createLayout
     auto decibel = AudioParameterFloatAttributes().withStringFromValueFunction (
         [] (float v, int) { return (v > 0 ? "+" : "") + String (v, 1).replaceCharacter ('.', ',') + " dB"; }).withValueFromStringFunction ([] (const String& text) { return text.replaceCharacter (',', '.').getFloatValue(); });
 
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "movement", 1 }, "Aktivität",
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "movement", 1 }, juce::String (juce::CharPointer_UTF8 ("Aktivit\xc3\xa4t")),
                                                        NormalisableRange<float> (0.0f, 1.0f), 0.4f, percent));
 
     NormalisableRange<float> levelRange (-60.0f, 12.0f, 0.1f);
     levelRange.setSkewForCentre (-18.0f);
-    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "level", 1 }, "Lautstärke",
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "level", 1 }, juce::String (juce::CharPointer_UTF8 ("Lautst\xc3\xa4rke")),
                                                        levelRange, -6.0f, decibel));
     return layout;
 }
